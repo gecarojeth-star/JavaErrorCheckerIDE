@@ -1,0 +1,2266 @@
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
+import java.nio.file.*;
+import java.util.*;
+import java.util.List;
+import java.util.regex.*;
+import javax.swing.*;
+import javax.swing.event.*;
+import javax.swing.plaf.ComponentUI;
+import javax.swing.plaf.basic.BasicTabbedPaneUI;
+import javax.swing.plaf.basic.BasicTreeUI;
+import javax.swing.text.*;
+import javax.swing.tree.*;
+import javax.swing.undo.*;
+
+// ============================================================================
+// THEME - Dracula Color Scheme
+// ============================================================================
+class Theme {
+    public static final Color APP_BG         = new Color(0x282a36);
+    public static final Color SURFACE_COLOR  = new Color(0x21222c);
+    public static final Color SIDEBAR_COLOR  = new Color(0x21222c);
+    public static final Color CURRENT_LINE   = new Color(0x44475a);
+    public static final Color BORDER_COLOR   = new Color(0x44475a);
+    public static final Color TEXT_MAIN      = new Color(0xf8f8f2);
+    public static final Color TEXT_MUTED     = new Color(0x6272a4);
+    public static final Color PRIMARY_COLOR  = new Color(0xbd93f9);
+    public static final Color PRIMARY_HOVER  = new Color(0xd0b3ff);
+    public static final Color SUCCESS_COLOR  = new Color(0x50fa7b);
+    public static final Color DANGER_COLOR   = new Color(0xff5555);
+    public static final Color CYAN_COLOR     = new Color(0x8be9fd);
+    public static final Color ORANGE_COLOR   = new Color(0xffb86c);
+    public static final Color PINK_COLOR     = new Color(0xff79c6);
+    public static final Color YELLOW_COLOR   = new Color(0xf1fa8c);
+    public static final Color WARNING_COLOR  = new Color(0xf1fa8c);
+    public static final Color COMMENT_COLOR  = new Color(0x6272a4);
+    public static final Color KEYWORD_COLOR  = new Color(0xff79c6);
+    public static final Color STRING_COLOR   = new Color(0xf1fa8c);
+    public static final Color NUMBER_COLOR   = new Color(0xbd93f9);
+    public static final Color ANNOTATION_COLOR = new Color(0x8be9fd);
+    public static final Color TYPE_COLOR     = new Color(0x8be9fd);
+
+    // Tab colors
+    public static final Color TAB_SELECTED_BG   = new Color(0xbd93f9);  // purple
+    public static final Color TAB_SELECTED_FG   = Color.WHITE;
+    public static final Color TAB_UNSELECTED_BG = new Color(0x21222c);  // dark
+    public static final Color TAB_UNSELECTED_FG = new Color(0xc9a0f5);  // light purple
+
+    public static final Font CODE_FONT       = new Font("Consolas", Font.PLAIN, 14);
+    public static final Font UI_FONT         = new Font("Segoe UI", Font.PLAIN, 13);
+    public static final Font UI_FONT_SMALL   = new Font("Segoe UI", Font.PLAIN, 12);
+    public static final Font UI_FONT_BOLD    = new Font("Segoe UI", Font.BOLD, 12);
+    public static final Font TERMINAL_FONT   = new Font("Consolas", Font.PLAIN, 13);
+
+    /**
+     * Recursively themes a JFileChooser dialog and all its components.
+     */
+    public static void themeFileChooser(JFileChooser fc) {
+        fc.setBackground(APP_BG);
+        fc.setForeground(TEXT_MAIN);
+        for (Component c : fc.getComponents()) {
+            themeComponent(c);
+        }
+        if (fc.getAccessory() != null) {
+            themeComponent(fc.getAccessory());
+        }
+    }
+
+    private static void themeComponent(Component c) {
+        if (c == null) return;
+        c.setBackground(APP_BG);
+        c.setForeground(TEXT_MAIN);
+        
+        if (c instanceof AbstractButton) {
+            ((AbstractButton) c).setBackground(SURFACE_COLOR);
+            ((AbstractButton) c).setForeground(TEXT_MAIN);
+            ((AbstractButton) c).setFocusPainted(false);
+        } else if (c instanceof JTextComponent) {
+            c.setBackground(APP_BG);
+            c.setForeground(TEXT_MAIN);
+            ((JTextComponent) c).setCaretColor(TEXT_MAIN);
+        } else if (c instanceof JComboBox) {
+            c.setBackground(SURFACE_COLOR);
+            c.setForeground(TEXT_MAIN);
+        } else if (c instanceof JList) {
+            c.setBackground(APP_BG);
+            c.setForeground(TEXT_MAIN);
+        } else if (c instanceof JTree) {
+            c.setBackground(APP_BG);
+            c.setForeground(TEXT_MAIN);
+        }
+        
+        if (c instanceof Container) {
+            for (Component child : ((Container) c).getComponents()) {
+                themeComponent(child);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// VECTOR ICONS – used in toolbar buttons and sidebar (no emojis)
+// ============================================================================
+class VectorIcon implements Icon {
+    public enum Type { PLAY, PLUS, FOLDER, FILE, TRASH, SEARCH, SUN, UNDO, REDO, SAVE, COMMENT, CROSS, SIDEBAR, ARROW_RIGHT, ARROW_DOWN }
+
+    private final Type type;
+    private final int size;
+    private final Color color;
+
+    public VectorIcon(Type type, int size, Color color) {
+        this.type = type; 
+        this.size = size; 
+        this.color = color;
+    }
+
+    @Override 
+    public int getIconWidth()  { return size; }
+    
+    @Override 
+    public int getIconHeight() { return size; }
+
+    @Override 
+    public void paintIcon(Component c, Graphics g, int x, int y) {
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        g2.setColor(color);
+        g2.setStroke(new BasicStroke(1.5f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+        
+        int w = size - 2;
+        int h = size - 2;
+        int cx = x + 1;
+        int cy = y + 1;
+        
+        switch (type) {
+            case PLAY:    
+                g2.fillPolygon(new int[]{cx+2, cx+w-1, cx+2}, new int[]{cy, cy+h/2, cy+h}, 3); 
+                break;
+            case UNDO:    
+                g2.drawArc(cx+2,cy+2,w-4,h-4,90,270); 
+                g2.drawLine(cx+w/2,cy,cx,cy+2); 
+                g2.drawLine(cx+w/2,cy+4,cx,cy+2); 
+                break;
+            case REDO:    
+                g2.drawArc(cx+2,cy+2,w-4,h-4,90,-270); 
+                g2.drawLine(cx+w/2,cy,cx+w,cy+2); 
+                g2.drawLine(cx+w/2,cy+4,cx+w,cy+2); 
+                break;
+            case PLUS:    
+                g2.drawLine(cx+w/2,cy,cx+w/2,cy+h); 
+                g2.drawLine(cx,cy+h/2,cx+w,cy+h/2); 
+                break;
+            case TRASH:   
+                g2.drawRect(cx+2,cy+2,w-4,h-2); 
+                g2.drawLine(cx,cy+2,cx+w,cy+2); 
+                break;
+            case FOLDER:  
+                g2.drawPolyline(new int[]{cx,cx+w/3,cx+w/2,cx+w,cx+w,cx,cx}, new int[]{cy+2,cy+2,cy+4,cy+4,cy+h,cy+h,cy+2},7); 
+                break;
+            case FILE:
+                g2.drawRect(cx + 2, cy + 1, w - 4, h - 2);
+                g2.drawLine(cx + 5, cy + 4, cx + w - 4, cy + 4);
+                g2.drawLine(cx + 5, cy + 7, cx + w - 4, cy + 7);
+                g2.drawLine(cx + 5, cy + 10, cx + w - 6, cy + 10);
+                break;
+            case SAVE:    
+                g2.drawRect(cx+1,cy+1,w-2,h-2); 
+                g2.drawRect(cx+3,cy+1,w-6,3); 
+                g2.drawRect(cx+4,cy+h-4,w-8,4); 
+                break;
+            case COMMENT: 
+                g2.drawRect(cx,cy+2,w,h-5); 
+                g2.drawLine(cx+w/2,cy+h-3,cx+w/4,cy+h); 
+                g2.drawLine(cx+w/4,cy+h,cx+w/4+2,cy+h-3); 
+                break;
+            case SEARCH:  
+                g2.drawOval(cx,cy,w-4,h-4); 
+                g2.drawLine(cx+w-4,cy+h-4,cx+w,cy+h); 
+                break;
+            case CROSS:   
+                g2.drawLine(cx+3,cy+3,cx+w-3,cy+h-3); 
+                g2.drawLine(cx+w-3,cy+3,cx+3,cy+h-3); 
+                break;
+            case SIDEBAR: 
+                g2.drawRect(cx,cy,w,h); 
+                g2.drawLine(cx+w/3,cy,cx+w/3,cy+h); 
+                break;
+            case SUN:     
+                g2.drawOval(cx+w/4,cy+h/4,w/2,h/2); 
+                g2.drawLine(cx+w/2,cy,cx+w/2,cy+h); 
+                g2.drawLine(cx,cy+h/2,cx+w,cy+h/2); 
+                break;
+            case ARROW_RIGHT: 
+                g2.fillPolygon(new int[]{cx+2, cx+w-4, cx+2}, new int[]{cy+2, cy+h/2, cy+h-2}, 3); 
+                break;
+            case ARROW_DOWN:  
+                g2.fillPolygon(new int[]{cx+2, cx+w-2, cx+w/2}, new int[]{cy+2, cy+2, cy+h-2}, 3); 
+                break;
+        }
+        g2.dispose();
+    }
+}
+
+// ============================================================================
+// TOKEN REPOSITORY – Complete dictionary of all Java tokens
+// ============================================================================
+class TokenRepository {
+    public enum TokenCategory { KEYWORD, IDENTIFIER, LITERAL, OPERATOR, SYMBOL, COMMENT, WHITESPACE, EOF }
+
+    public enum TokenType {
+        PUBLIC("public", TokenCategory.KEYWORD), PRIVATE("private", TokenCategory.KEYWORD),
+        PROTECTED("protected", TokenCategory.KEYWORD), STATIC("static", TokenCategory.KEYWORD),
+        FINAL("final", TokenCategory.KEYWORD), ABSTRACT("abstract", TokenCategory.KEYWORD),
+        SYNCHRONIZED("synchronized", TokenCategory.KEYWORD), TRANSIENT("transient", TokenCategory.KEYWORD),
+        VOLATILE("volatile", TokenCategory.KEYWORD), NATIVE("native", TokenCategory.KEYWORD),
+        STRICTFP("strictfp", TokenCategory.KEYWORD), DEFAULT("default", TokenCategory.KEYWORD),
+        BYTE("byte", TokenCategory.KEYWORD), SHORT("short", TokenCategory.KEYWORD),
+        INT("int", TokenCategory.KEYWORD), LONG("long", TokenCategory.KEYWORD),
+        FLOAT("float", TokenCategory.KEYWORD), DOUBLE("double", TokenCategory.KEYWORD),
+        BOOLEAN("boolean", TokenCategory.KEYWORD), CHAR("char", TokenCategory.KEYWORD),
+        VOID("void", TokenCategory.KEYWORD), CLASS("class", TokenCategory.KEYWORD),
+        INTERFACE("interface", TokenCategory.KEYWORD), ENUM("enum", TokenCategory.KEYWORD),
+        EXTENDS("extends", TokenCategory.KEYWORD), IMPLEMENTS("implements", TokenCategory.KEYWORD),
+        NEW("new", TokenCategory.KEYWORD), SUPER("super", TokenCategory.KEYWORD),
+        THIS("this", TokenCategory.KEYWORD), INSTANCEOF("instanceof", TokenCategory.KEYWORD),
+        IF("if", TokenCategory.KEYWORD), ELSE("else", TokenCategory.KEYWORD),
+        SWITCH("switch", TokenCategory.KEYWORD), CASE("case", TokenCategory.KEYWORD),
+        FOR("for", TokenCategory.KEYWORD), WHILE("while", TokenCategory.KEYWORD),
+        DO("do", TokenCategory.KEYWORD), BREAK("break", TokenCategory.KEYWORD),
+        CONTINUE("continue", TokenCategory.KEYWORD), RETURN("return", TokenCategory.KEYWORD),
+        TRY("try", TokenCategory.KEYWORD), CATCH("catch", TokenCategory.KEYWORD),
+        FINALLY("finally", TokenCategory.KEYWORD), THROW("throw", TokenCategory.KEYWORD),
+        THROWS("throws", TokenCategory.KEYWORD), ASSERT("assert", TokenCategory.KEYWORD),
+        PACKAGE("package", TokenCategory.KEYWORD), IMPORT("import", TokenCategory.KEYWORD),
+        TRUE("true", TokenCategory.KEYWORD), FALSE("false", TokenCategory.KEYWORD),
+        NULL("null", TokenCategory.KEYWORD), GOTO("goto", TokenCategory.KEYWORD),
+        CONST("const", TokenCategory.KEYWORD),
+        IDENTIFIER(null, TokenCategory.IDENTIFIER), TYPE_IDENTIFIER(null, TokenCategory.IDENTIFIER),
+        INTEGER_LITERAL(null, TokenCategory.LITERAL), LONG_LITERAL(null, TokenCategory.LITERAL),
+        FLOAT_LITERAL(null, TokenCategory.LITERAL), DOUBLE_LITERAL(null, TokenCategory.LITERAL),
+        STRING_LITERAL(null, TokenCategory.LITERAL), CHAR_LITERAL(null, TokenCategory.LITERAL),
+        TEXT_BLOCK(null, TokenCategory.LITERAL),
+        PLUS("+", TokenCategory.OPERATOR), MINUS("-", TokenCategory.OPERATOR),
+        STAR("*", TokenCategory.OPERATOR), SLASH("/", TokenCategory.OPERATOR),
+        PERCENT("%", TokenCategory.OPERATOR), PLUS_PLUS("++", TokenCategory.OPERATOR),
+        MINUS_MINUS("--", TokenCategory.OPERATOR), EQUAL("=", TokenCategory.OPERATOR),
+        PLUS_EQUAL("+=", TokenCategory.OPERATOR), MINUS_EQUAL("-=", TokenCategory.OPERATOR),
+        STAR_EQUAL("*=", TokenCategory.OPERATOR), SLASH_EQUAL("/=", TokenCategory.OPERATOR),
+        PERCENT_EQUAL("%=", TokenCategory.OPERATOR), AND_EQUAL("&=", TokenCategory.OPERATOR),
+        OR_EQUAL("|=", TokenCategory.OPERATOR), XOR_EQUAL("^=", TokenCategory.OPERATOR),
+        LSHIFT_EQUAL("<<=", TokenCategory.OPERATOR), RSHIFT_EQUAL(">>=", TokenCategory.OPERATOR),
+        URSHIFT_EQUAL(">>>=", TokenCategory.OPERATOR), EQUAL_EQUAL("==", TokenCategory.OPERATOR),
+        NOT_EQUAL("!=", TokenCategory.OPERATOR), LESS_THAN("<", TokenCategory.OPERATOR),
+        GREATER_THAN(">", TokenCategory.OPERATOR), LESS_EQUAL("<=", TokenCategory.OPERATOR),
+        GREATER_EQUAL(">=", TokenCategory.OPERATOR), AND_AND("&&", TokenCategory.OPERATOR),
+        OR_OR("||", TokenCategory.OPERATOR), BANG("!", TokenCategory.OPERATOR),
+        AND("&", TokenCategory.OPERATOR), OR("|", TokenCategory.OPERATOR),
+        XOR("^", TokenCategory.OPERATOR), TILDE("~", TokenCategory.OPERATOR),
+        LSHIFT("<<", TokenCategory.OPERATOR), RSHIFT(">>", TokenCategory.OPERATOR),
+        URSHIFT(">>>", TokenCategory.OPERATOR), QUESTION("?", TokenCategory.OPERATOR),
+        COLON(":", TokenCategory.OPERATOR), ARROW("->", TokenCategory.OPERATOR),
+        METHOD_REF("::", TokenCategory.OPERATOR),
+        LPAREN("(", TokenCategory.SYMBOL), RPAREN(")", TokenCategory.SYMBOL),
+        LBRACE("{", TokenCategory.SYMBOL), RBRACE("}", TokenCategory.SYMBOL),
+        LBRACKET("[", TokenCategory.SYMBOL), RBRACKET("]", TokenCategory.SYMBOL),
+        SEMICOLON(";", TokenCategory.SYMBOL), COMMA(",", TokenCategory.SYMBOL),
+        DOT(".", TokenCategory.SYMBOL), ELLIPSIS("...", TokenCategory.SYMBOL),
+        AT("@", TokenCategory.SYMBOL),
+        LINE_COMMENT(null, TokenCategory.COMMENT), BLOCK_COMMENT(null, TokenCategory.COMMENT),
+        JAVADOC_COMMENT(null, TokenCategory.COMMENT),
+        WHITESPACE(null, TokenCategory.WHITESPACE), NEWLINE(null, TokenCategory.WHITESPACE),
+        EOF(null, TokenCategory.EOF);
+
+        private final String lexeme;
+        private final TokenCategory category;
+        
+        TokenType(String lexeme, TokenCategory category) { 
+            this.lexeme = lexeme; 
+            this.category = category; 
+        }
+        
+        public String getLexeme() { return lexeme; }
+        public TokenCategory getCategory() { return category; }
+        public boolean isKeyword()  { return category == TokenCategory.KEYWORD; }
+        public boolean isLiteral()  { return category == TokenCategory.LITERAL; }
+        public boolean isOperator() { return category == TokenCategory.OPERATOR; }
+        public boolean isComment()  { return category == TokenCategory.COMMENT; }
+        
+        public boolean isType() {
+            return this==BYTE||this==SHORT||this==INT||this==LONG||this==FLOAT||this==DOUBLE
+                ||this==BOOLEAN||this==CHAR||this==VOID||this==TYPE_IDENTIFIER;
+        }
+        
+        public boolean isModifier() {
+            return this==PUBLIC||this==PRIVATE||this==PROTECTED||this==STATIC||this==FINAL
+                ||this==ABSTRACT||this==SYNCHRONIZED||this==TRANSIENT||this==VOLATILE
+                ||this==NATIVE||this==STRICTFP;
+        }
+        
+        public boolean isAccessModifier() { 
+            return this==PUBLIC||this==PRIVATE||this==PROTECTED; 
+        }
+        
+        public boolean isControlFlow() {
+            return this==IF||this==ELSE||this==SWITCH||this==CASE||this==DEFAULT
+                ||this==FOR||this==WHILE||this==DO||this==BREAK||this==CONTINUE||this==RETURN;
+        }
+    }
+
+    private static final Map<String, TokenType>    KEYWORD_MAP  = new HashMap<>();
+    private static final Map<String, TokenType>    OPERATOR_MAP = new HashMap<>();
+    private static final Map<Character, TokenType> SYMBOL_MAP   = new HashMap<>();
+
+    static {
+        for (TokenType t : TokenType.values()) {
+            if (t.isKeyword() && t.getLexeme() != null) KEYWORD_MAP.put(t.getLexeme(), t);
+            if (t.getCategory()==TokenCategory.OPERATOR && t.getLexeme()!=null) OPERATOR_MAP.put(t.getLexeme(), t);
+            if (t.getCategory()==TokenCategory.SYMBOL && t.getLexeme()!=null && t.getLexeme().length()==1)
+                SYMBOL_MAP.put(t.getLexeme().charAt(0), t);
+        }
+        KEYWORD_MAP.put("String", TokenType.TYPE_IDENTIFIER);
+        KEYWORD_MAP.put("Object", TokenType.TYPE_IDENTIFIER);
+        KEYWORD_MAP.put("System", TokenType.TYPE_IDENTIFIER);
+    }
+
+    public static final Set<String> BUILTIN_TYPES = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+        "String","Object","Integer","Double","Float","Long","Boolean","Character","Byte","Short",
+        "Number","Math","System","StringBuilder","StringBuffer","Arrays","Collections","List",
+        "ArrayList","LinkedList","HashMap","HashSet","TreeMap","TreeSet","Map","Set","Queue",
+        "Deque","Stack","Vector","LinkedHashMap","LinkedHashSet","Iterator","Iterable","Comparable",
+        "Cloneable","Serializable","Scanner","Random","File","Path","Files","Paths","InputStream",
+        "OutputStream","Reader","Writer","BufferedReader","BufferedWriter","PrintWriter","PrintStream",
+        "Exception","RuntimeException","Error","Throwable","IOException","NullPointerException",
+        "IllegalArgumentException","IndexOutOfBoundsException","ArrayIndexOutOfBoundsException",
+        "ClassCastException","NumberFormatException","Thread","Runnable","Callable","Future",
+        "Class","Enum","Optional","Stream","Collectors","Pattern","Matcher","Override","Deprecated",
+        "SuppressWarnings","FunctionalInterface","SafeVarargs"
+    )));
+
+    public static final Set<String> SAFE_IDENTIFIERS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+        "out","in","err","println","print","printf","format","write","read","close","open","flush",
+        "toString","equals","hashCode","compareTo","length","size","isEmpty","get","set","add",
+        "remove","contains","put","clear","toArray","iterator","next","hasNext","previous","hasPrevious",
+        "parseInt","parseDouble","parseFloat","parseLong","parseBoolean","valueOf","intValue",
+        "doubleValue","floatValue","longValue","charAt","substring","indexOf","lastIndexOf",
+        "startsWith","endsWith","trim","strip","toLowerCase","toUpperCase","replace","replaceAll",
+        "split","join","matches","toCharArray","getBytes","abs","max","min","pow","sqrt","ceil",
+        "floor","round","random","append","insert","delete","reverse","nextLine","nextInt",
+        "nextDouble","nextFloat","nextLong","nextBoolean","sort","binarySearch","fill","copyOf",
+        "copyOfRange","asList","exit","gc","currentTimeMillis","nanoTime","getClass","getName",
+        "getSimpleName","forName","newInstance","cast","args","main",
+        "i","j","k","l","m","n","p","q","r","s","t","u","v","w","x","y","z","a","b","c","d","e","f","g","h",
+        "result","output","input","value","total","sum","count","index","temp","tmp","aux","buf",
+        "buffer","data","info","msg","message","str","text","line","word","num","number","key","val",
+        "min","max","avg","mean","diff","delta","step","start","end","left","right","top","bottom",
+        "width","height","name","title","label","id","type","kind","mode","flag","state","found",
+        "done","valid","error","success","ok","ready","list","arr","array","map","set","queue",
+        "stack","tree","node","head","tail","root","parent","child","curr","current","first","last",
+        "elem","element","item","entry","pair","row","col","column","pos","position","offset",
+        "cursor","path","file","dir","folder","stream","reader","writer","scanner","expected",
+        "actual","test","mock","spy","stub","ex","exception","cause","iter","it","itr","obj","ret","res"
+    )));
+
+    public static TokenType getKeywordType(String kw)  { 
+        return KEYWORD_MAP.getOrDefault(kw, TokenType.IDENTIFIER); 
+    }
+    
+    public static TokenType getOperatorType(String op) { 
+        return OPERATOR_MAP.get(op); 
+    }
+    
+    public static TokenType getSymbolType(char sym)    { 
+        return SYMBOL_MAP.get(sym); 
+    }
+    
+    public static boolean isJavaKeyword(String word) { 
+        return KEYWORD_MAP.containsKey(word) && KEYWORD_MAP.get(word)!=TokenType.TYPE_IDENTIFIER; 
+    }
+    
+    public static Set<String> getAllKeywords() {
+        Set<String> out = new HashSet<>();
+        for (Map.Entry<String,TokenType> e : KEYWORD_MAP.entrySet()) {
+            if (e.getValue()!=TokenType.TYPE_IDENTIFIER) {
+                out.add(e.getKey());
+            }
+        }
+        return out;
+    }
+}
+
+// ============================================================================
+// TOKEN
+// ============================================================================
+class Token {
+    public final TokenRepository.TokenType type;
+    public final String value;
+    public final int line, column, startOffset, endOffset;
+
+    public Token(TokenRepository.TokenType type, String value, int line, int column, int startOffset, int endOffset) {
+        this.type=type; 
+        this.value=value; 
+        this.line=line; 
+        this.column=column;
+        this.startOffset=startOffset; 
+        this.endOffset=endOffset;
+    }
+    
+    public boolean isType()     { return type.isType(); }
+    public boolean isModifier() { return type.isModifier(); }
+    public boolean isLiteral()  { return type.isLiteral(); }
+    public boolean isOperator() { return type.isOperator(); }
+    public boolean isComment()  { return type.isComment(); }
+    
+    @Override 
+    public String toString() { 
+        return String.format("[%s] '%s' @%d:%d", type.name(), value, line, column); 
+    }
+}
+
+// ============================================================================
+// AST NODE
+// ============================================================================
+class ASTNode {
+    public enum NodeType {
+        COMPILATION_UNIT, PACKAGE_DECLARATION, IMPORT_DECLARATION,
+        CLASS_DECLARATION, INTERFACE_DECLARATION, ENUM_DECLARATION,
+        METHOD_DECLARATION, CONSTRUCTOR_DECLARATION, FIELD_DECLARATION, VARIABLE_DECLARATION,
+        BLOCK, IF_STATEMENT, FOR_STATEMENT, WHILE_STATEMENT, DO_WHILE_STATEMENT,
+        SWITCH_STATEMENT, TRY_STATEMENT, RETURN_STATEMENT, EXPRESSION_STATEMENT
+    }
+    
+    public final NodeType nodeType;
+    public final String name;
+    public final int line, startOffset, endOffset;
+    public final List<ASTNode> children = new ArrayList<>();
+    public final Map<String, Object> properties = new HashMap<>();
+
+    public ASTNode(NodeType nodeType, String name, int line, int start, int end) {
+        this.nodeType=nodeType; 
+        this.name=name; 
+        this.line=line; 
+        this.startOffset=start; 
+        this.endOffset=end;
+    }
+    
+    public void addChild(ASTNode child) { 
+        if (child!=null) children.add(child); 
+    }
+    
+    public void setProperty(String k, Object v) { 
+        properties.put(k, v); 
+    }
+    
+    public Object getProperty(String k) { 
+        return properties.get(k); 
+    }
+}
+
+// ============================================================================
+// CODE ERROR
+// ============================================================================
+class CodeError implements Comparable<CodeError> {
+    public enum Severity {
+        ERROR("Error", Theme.DANGER_COLOR), 
+        WARNING("Warn", Theme.WARNING_COLOR),
+        INFO("Info", Theme.TEXT_MUTED), 
+        HINT("Hint", Theme.CYAN_COLOR);
+        
+        public final String label;
+        public final Color  color;
+        
+        Severity(String label, Color color) { 
+            this.label=label; 
+            this.color=color; 
+        }
+    }
+    
+    public final String message, hint;
+    public final int line, column, startOffset, endOffset;
+    public final Severity severity;
+
+    public CodeError(String message, String hint, int line, int column, int startOffset, int endOffset, Severity severity) {
+        this.message=message; 
+        this.hint=hint; 
+        this.line=line; 
+        this.column=column;
+        this.startOffset=startOffset; 
+        this.endOffset=endOffset; 
+        this.severity=severity;
+    }
+    
+    @Override 
+    public int compareTo(CodeError o) {
+        int c = Integer.compare(this.line, o.line);
+        return c!=0 ? c : Integer.compare(this.column, o.column);
+    }
+}
+
+// ============================================================================
+// ERROR MANAGER
+// ============================================================================
+class ErrorManager {
+    private final List<CodeError> errors = new ArrayList<>();
+    private final Set<String> dedup = new HashSet<>();
+
+    private void add(String msg, String hint, int line, int col, int start, int end, CodeError.Severity sev) {
+        String key = line+":"+col+":"+msg;
+        if (!dedup.contains(key)) { 
+            dedup.add(key); 
+            errors.add(new CodeError(msg,hint,line,col,start,end,sev)); 
+        }
+    }
+    
+    public void addSyntaxError  (String m,String h,int ln,int col,int s,int e){ add(m,h,ln,col,s,e,CodeError.Severity.ERROR); }
+    public void addSemanticError(String m,String h,int ln,int col,int s,int e){ add(m,h,ln,col,s,e,CodeError.Severity.ERROR); }
+    public void addError        (String m,String h,int ln,int col,int s,int e,CodeError.Severity sv){ add(m,h,ln,col,s,e,sv); }
+    public void addWarning      (String m,String h,int ln,int col,int s,int e){ add(m,h,ln,col,s,e,CodeError.Severity.WARNING); }
+    public void addInfo         (String m,String h,int ln,int col,int s,int e){ add(m,h,ln,col,s,e,CodeError.Severity.INFO); }
+    public void addHint         (String m,String h,int ln,int col,int s,int e){ add(m,h,ln,col,s,e,CodeError.Severity.HINT); }
+    
+    public List<CodeError> getErrors() { 
+        List<CodeError> out=new ArrayList<>(errors); 
+        Collections.sort(out); 
+        return out; 
+    }
+    
+    public boolean hasErrors()  { 
+        return errors.stream().anyMatch(e->e.severity==CodeError.Severity.ERROR); 
+    }
+    
+    public boolean hasIssues()  { 
+        return !errors.isEmpty(); 
+    }
+    
+    public void clear() { 
+        errors.clear(); 
+        dedup.clear(); 
+    }
+    
+    public int getErrorCount() { 
+        return (int)errors.stream().filter(e->e.severity==CodeError.Severity.ERROR).count(); 
+    }
+    
+    public int getWarningCount(){ 
+        return (int)errors.stream().filter(e->e.severity==CodeError.Severity.WARNING).count(); 
+    }
+    
+    public int getInfoCount() { 
+        return (int)errors.stream().filter(e->e.severity==CodeError.Severity.INFO||e.severity==CodeError.Severity.HINT).count(); 
+    }
+}
+
+// ============================================================================
+// JAVA LEXER
+// ============================================================================
+class JavaLexer {
+    private final String source;
+    private int pos, line, column;
+    private final List<Token> tokens = new ArrayList<>();
+
+    public JavaLexer(String src) { 
+        this.source=src!=null?src:""; 
+        this.pos=0; 
+        this.line=1; 
+        this.column=1; 
+    }
+
+    public List<Token> tokenize() {
+        tokens.clear();
+        while (pos < source.length()) {
+            char ch = source.charAt(pos);
+            if (ch==' '||ch=='\t'||ch=='\r') { advance(); continue; }
+            if (ch=='\n') { addToken(TokenRepository.TokenType.NEWLINE,"\n"); advance(); line++; column=1; continue; }
+            if (ch=='/'&&peek()=='/') { lexLineComment(); continue; }
+            if (ch=='/'&&peek()=='*') { lexBlockComment(); continue; }
+            if (ch=='"') {
+                if (pos+2<source.length()&&source.charAt(pos+1)=='"'&&source.charAt(pos+2)=='"') lexTextBlock();
+                else lexString();
+                continue;
+            }
+            if (ch=='\'') { lexChar(); continue; }
+            if (Character.isDigit(ch)||(ch=='.'&&pos+1<source.length()&&Character.isDigit(source.charAt(pos+1)))) { lexNumber(); continue; }
+            if (Character.isJavaIdentifierStart(ch)) { lexIdentifier(); continue; }
+            if (!lexOperatorOrSymbol()) advance();
+        }
+        tokens.add(new Token(TokenRepository.TokenType.EOF,"",line,column,pos,pos));
+        return tokens;
+    }
+
+    private void lexLineComment() {
+        int s=pos,sl=line,sc=column; 
+        StringBuilder sb=new StringBuilder();
+        while (pos<source.length()&&source.charAt(pos)!='\n') { 
+            sb.append(source.charAt(pos)); 
+            advance(); 
+        }
+        tokens.add(new Token(TokenRepository.TokenType.LINE_COMMENT,sb.toString(),sl,sc,s,pos));
+    }
+    
+    private void lexBlockComment() {
+        int s=pos,sl=line,sc=column; 
+        StringBuilder sb=new StringBuilder();
+        sb.append("/*"); advance(); advance();
+        while (pos<source.length()-1&&!(source.charAt(pos)=='*'&&source.charAt(pos+1)=='/')) {
+            if (source.charAt(pos)=='\n') { line++; column=1; }
+            sb.append(source.charAt(pos)); advance();
+        }
+        if (pos<source.length()-1) { sb.append("*/"); advance(); advance(); }
+        TokenRepository.TokenType t = sb.toString().startsWith("/**") ? TokenRepository.TokenType.JAVADOC_COMMENT : TokenRepository.TokenType.BLOCK_COMMENT;
+        tokens.add(new Token(t,sb.toString(),sl,sc,s,pos));
+    }
+    
+    private void lexString() {
+        int s=pos,sl=line,sc=column; 
+        StringBuilder sb=new StringBuilder();
+        sb.append('"'); advance();
+        while (pos<source.length()&&source.charAt(pos)!='"'&&source.charAt(pos)!='\n') {
+            if (source.charAt(pos)=='\\') { 
+                sb.append(source.charAt(pos)); advance(); 
+                if (pos<source.length()) { sb.append(source.charAt(pos)); advance(); } 
+            } else { 
+                sb.append(source.charAt(pos)); advance(); 
+            }
+        }
+        if (pos<source.length()&&source.charAt(pos)=='"') { sb.append('"'); advance(); }
+        tokens.add(new Token(TokenRepository.TokenType.STRING_LITERAL,sb.toString(),sl,sc,s,pos));
+    }
+    
+    private void lexTextBlock() {
+        int s=pos,sl=line,sc=column; 
+        StringBuilder sb=new StringBuilder();
+        sb.append("\"\"\""); advance(); advance(); advance();
+        while (pos<source.length()-2&&!(source.charAt(pos)=='"'&&source.charAt(pos+1)=='"'&&source.charAt(pos+2)=='"')) {
+            if (source.charAt(pos)=='\n') { line++; column=1; }
+            sb.append(source.charAt(pos)); advance();
+        }
+        if (pos<source.length()-2) { sb.append("\"\"\""); advance(); advance(); advance(); }
+        tokens.add(new Token(TokenRepository.TokenType.TEXT_BLOCK,sb.toString(),sl,sc,s,pos));
+    }
+    
+    private void lexChar() {
+        int s=pos,sl=line,sc=column; 
+        StringBuilder sb=new StringBuilder();
+        sb.append('\''); advance();
+        if (pos<source.length()) {
+            if (source.charAt(pos)=='\\') { 
+                sb.append(source.charAt(pos)); advance(); 
+                if (pos<source.length()) { sb.append(source.charAt(pos)); advance(); } 
+            } else if (source.charAt(pos)!='\'') { 
+                sb.append(source.charAt(pos)); advance(); 
+            }
+        }
+        while (pos<source.length()&&source.charAt(pos)!='\''&&source.charAt(pos)!='\n') { 
+            sb.append(source.charAt(pos)); advance(); 
+        }
+        if (pos<source.length()&&source.charAt(pos)=='\'') { 
+            sb.append('\''); advance(); 
+        }
+        tokens.add(new Token(TokenRepository.TokenType.CHAR_LITERAL,sb.toString(),sl,sc,s,pos));
+    }
+    
+    private void lexNumber() {
+        int s=pos,sl=line,sc=column; 
+        StringBuilder sb=new StringBuilder(); 
+        boolean isFloat=false;
+        
+        if (pos<source.length()&&source.charAt(pos)=='0'&&pos+1<source.length()&&(source.charAt(pos+1)=='x'||source.charAt(pos+1)=='X')) {
+            sb.append(source.charAt(pos)); advance(); sb.append(source.charAt(pos)); advance();
+            while (pos<source.length()&&(Character.isDigit(source.charAt(pos))||"abcdefABCDEF_".indexOf(source.charAt(pos))>=0)) { 
+                sb.append(source.charAt(pos)); advance(); 
+            }
+        } else {
+            while (pos<source.length()&&(Character.isDigit(source.charAt(pos))||source.charAt(pos)=='.'||source.charAt(pos)=='_')) {
+                if (source.charAt(pos)=='.') isFloat=true;
+                sb.append(source.charAt(pos)); advance();
+            }
+        }
+        if (pos<source.length()) {
+            char sfx=source.charAt(pos);
+            if (sfx=='f'||sfx=='F'||sfx=='d'||sfx=='D'||sfx=='l'||sfx=='L') { 
+                sb.append(sfx); advance(); 
+                if (sfx=='f'||sfx=='F'||sfx=='d'||sfx=='D') isFloat=true; 
+            }
+        }
+        String v=sb.toString();
+        TokenRepository.TokenType t=(v.endsWith("f")||v.endsWith("F"))?TokenRepository.TokenType.FLOAT_LITERAL:
+            (v.endsWith("d")||v.endsWith("D"))?TokenRepository.TokenType.DOUBLE_LITERAL:
+            (v.endsWith("l")||v.endsWith("L"))?TokenRepository.TokenType.LONG_LITERAL:
+            isFloat?TokenRepository.TokenType.DOUBLE_LITERAL:TokenRepository.TokenType.INTEGER_LITERAL;
+        tokens.add(new Token(t,v,sl,sc,s,pos));
+    }
+    
+    private void lexIdentifier() {
+        int s=pos,sl=line,sc=column; 
+        StringBuilder sb=new StringBuilder();
+        while (pos<source.length()&&Character.isJavaIdentifierPart(source.charAt(pos))) { 
+            sb.append(source.charAt(pos)); advance(); 
+        }
+        String word=sb.toString();
+        tokens.add(new Token(TokenRepository.getKeywordType(word),word,sl,sc,s,pos));
+    }
+    
+    private boolean lexOperatorOrSymbol() {
+        int s=pos; char ch=source.charAt(pos);
+        String two=pos+1<source.length()?source.substring(pos,pos+2):"";
+        String three=pos+2<source.length()?source.substring(pos,pos+3):"";
+        String four=pos+3<source.length()?source.substring(pos,pos+4):"";
+        
+        TokenRepository.TokenType type=null; 
+        String val=null; 
+        int len=0;
+        
+        if (">>>=".equals(four)) { type=TokenRepository.TokenType.URSHIFT_EQUAL; val=">>>="; len=4; }
+        else if (">>>".equals(three)) { type=TokenRepository.TokenType.URSHIFT; val=">>>"; len=3; }
+        else if ("<<=".equals(three)) { type=TokenRepository.TokenType.LSHIFT_EQUAL; val="<<="; len=3; }
+        else if (">>=".equals(three)) { type=TokenRepository.TokenType.RSHIFT_EQUAL; val=">>="; len=3; }
+        else if ("...".equals(three)) { type=TokenRepository.TokenType.ELLIPSIS; val="..."; len=3; }
+        else {
+            type=TokenRepository.getOperatorType(two);
+            if (type!=null) { val=two; len=2; }
+            else {
+                type=TokenRepository.getSymbolType(ch);
+                if (type==null) type=TokenRepository.getOperatorType(String.valueOf(ch));
+                if (type!=null) { val=String.valueOf(ch); len=1; }
+            }
+        }
+        
+        if (type!=null) { 
+            tokens.add(new Token(type,val,line,column,s,s+len)); 
+            for (int i=0;i<len;i++) advance(); 
+            return true; 
+        }
+        return false;
+    }
+    
+    private void addToken(TokenRepository.TokenType t,String v) { 
+        tokens.add(new Token(t,v,line,column,pos,pos+v.length())); 
+    }
+    
+    private char peek() { 
+        return pos+1<source.length()?source.charAt(pos+1):'\0'; 
+    }
+    
+    private void advance() { 
+        if (pos<source.length()) { pos++; column++; } 
+    }
+}
+
+// ============================================================================
+// JAVA PARSER
+// ============================================================================
+class JavaParser {
+    private final List<Token> tokens;
+    private int pos;
+    private final ErrorManager em;
+
+    public JavaParser(List<Token> tokens, ErrorManager em) { 
+        this.tokens=tokens; 
+        this.pos=0; 
+        this.em=em; 
+    }
+
+    public ASTNode parse() {
+        ASTNode root=new ASTNode(ASTNode.NodeType.COMPILATION_UNIT,"root",1,0,0);
+        skipComments();
+        if (check(TokenRepository.TokenType.PACKAGE)) { 
+            advance(); 
+            root.addChild(parsePackageDecl()); 
+        }
+        skipComments();
+        while (check(TokenRepository.TokenType.IMPORT)) { 
+            advance(); 
+            root.addChild(parseImportDecl()); 
+            skipComments(); 
+        }
+        while (!isEOF()) { 
+            skipComments(); 
+            if (isEOF()) break; 
+            if (isTypeDeclarationStart()) root.addChild(parseTypeDecl()); 
+            else advance(); 
+        }
+        return root;
+    }
+    
+    private ASTNode parsePackageDecl() {
+        int ln=current().line; 
+        StringBuilder name=new StringBuilder();
+        while (!check(TokenRepository.TokenType.SEMICOLON)&&!isEOF()) { 
+            name.append(current().value); 
+            advance(); 
+        }
+        if (check(TokenRepository.TokenType.SEMICOLON)) advance();
+        return new ASTNode(ASTNode.NodeType.PACKAGE_DECLARATION,name.toString().trim(),ln,0,0);
+    }
+    
+    private ASTNode parseImportDecl() {
+        int ln=current().line; 
+        StringBuilder name=new StringBuilder();
+        while (!check(TokenRepository.TokenType.SEMICOLON)&&!isEOF()) { 
+            name.append(current().value); 
+            advance(); 
+        }
+        if (check(TokenRepository.TokenType.SEMICOLON)) advance();
+        return new ASTNode(ASTNode.NodeType.IMPORT_DECLARATION,name.toString().trim(),ln,0,0);
+    }
+    
+    private ASTNode parseTypeDecl() {
+        while (current().isModifier()) advance();
+        ASTNode.NodeType kind=ASTNode.NodeType.CLASS_DECLARATION;
+        if (check(TokenRepository.TokenType.INTERFACE)) { advance(); kind=ASTNode.NodeType.INTERFACE_DECLARATION; }
+        else if (check(TokenRepository.TokenType.ENUM)) { advance(); kind=ASTNode.NodeType.ENUM_DECLARATION; }
+        else if (check(TokenRepository.TokenType.CLASS)) { advance(); }
+        else { advance(); return null; }
+        
+        Token nameToken=null;
+        if (check(TokenRepository.TokenType.IDENTIFIER)||current().isType()) { 
+            nameToken=advance(); 
+        }
+        String cname=nameToken!=null?nameToken.value:"Unknown";
+        int cline=nameToken!=null?nameToken.line:0;
+        ASTNode node=new ASTNode(kind,cname,cline,0,0);
+        
+        while (!check(TokenRepository.TokenType.LBRACE)&&!isEOF()) advance();
+        if (check(TokenRepository.TokenType.LBRACE)) {
+            advance(); int depth=1;
+            while (depth>0&&!isEOF()) {
+                if (check(TokenRepository.TokenType.LBRACE)) { depth++; advance(); }
+                else if (check(TokenRepository.TokenType.RBRACE)) { depth--; advance(); }
+                else advance();
+            }
+        } else {
+            em.addSyntaxError("Expected '{' for type body","Add opening brace '{'",current().line,current().column,current().startOffset,current().endOffset);
+        }
+        return node;
+    }
+    
+    private boolean isTypeDeclarationStart() {
+        TokenRepository.TokenType t=current().type;
+        return t==TokenRepository.TokenType.CLASS||t==TokenRepository.TokenType.INTERFACE
+            ||t==TokenRepository.TokenType.ENUM||current().isModifier()||t==TokenRepository.TokenType.AT;
+    }
+    
+    private Token current() { return pos<tokens.size()?tokens.get(pos):new Token(TokenRepository.TokenType.EOF,"",0,0,0,0); }
+    private Token advance() { Token t=current(); if (pos<tokens.size()) pos++; skipComments(); return t; }
+    private boolean check(TokenRepository.TokenType t) { return current().type==t; }
+    private boolean isEOF() { return current().type==TokenRepository.TokenType.EOF; }
+    private void skipComments() { while (!isEOF()&&current().isComment()) pos++; }
+}
+
+// ============================================================================
+// SEMANTIC ANALYZER 
+// ============================================================================
+class SemanticAnalyzer {
+    private final ErrorManager em;
+    private final String source;
+    private final List<Token> tokens;
+    private final List<Token> code;
+    private final Set<Integer> packageImportLines = new HashSet<>();
+    private final Set<String> classFieldNames = new HashSet<>();
+
+    public SemanticAnalyzer(String source, List<Token> tokens, ASTNode ast, ErrorManager em) {
+        this.source = source;
+        this.em = em;
+        this.tokens = tokens;
+        this.code = new ArrayList<>();
+        for (Token t : tokens) {
+            if (!t.isComment() && t.type != TokenRepository.TokenType.WHITESPACE
+                    && t.type != TokenRepository.TokenType.NEWLINE) {
+                code.add(t);
+            }
+        }
+        buildPackageImportLines();
+    }
+
+    private void buildPackageImportLines() {
+        for (int i = 0; i < code.size(); i++) {
+            Token t = code.get(i);
+            if (t.type == TokenRepository.TokenType.PACKAGE || t.type == TokenRepository.TokenType.IMPORT) {
+                packageImportLines.add(t.line);
+                for (int j = i + 1; j < code.size(); j++) {
+                    packageImportLines.add(code.get(j).line);
+                    if (code.get(j).type == TokenRepository.TokenType.SEMICOLON) break;
+                }
+            }
+        }
+    }
+
+    public void analyze() {
+        if (code.isEmpty()) return;
+        checkLexicalErrors();
+        checkBracketMatching();
+        checkModifierConflicts();
+        checkDuplicateVariablesInScope();
+        checkClassFieldDuplicates();
+        checkDivisionByZero();
+        checkReturnVoid();
+        checkEmptyBlocks();
+        checkTypos();
+        checkStringEquality();
+        checkNullToPrimitive();
+        checkInfiniteWhileTrue();
+        checkEmptyCatchBlocks();
+        validateImports();
+    }
+
+    private void checkLexicalErrors() {
+        for (Token t : tokens) {
+            if (t.type == TokenRepository.TokenType.STRING_LITERAL) {
+                if (!t.value.endsWith("\"") || t.value.length() < 2)
+                    em.addSyntaxError("Unterminated string literal", "Close the string with a double-quote (\")", t.line, t.column, t.startOffset, t.endOffset);
+            }
+            if (t.type == TokenRepository.TokenType.CHAR_LITERAL) {
+                String v = t.value;
+                boolean badClose = !v.endsWith("'");
+                boolean tooShort = v.length() < 3;
+                boolean tooLong = v.startsWith("'\\") ? v.length() > 4 : v.length() > 3;
+                if (badClose || tooShort || tooLong)
+                    em.addSyntaxError("Invalid character literal: " + v, "A char literal holds exactly one character, e.g. 'A' or '\\n'", t.line, t.column, t.startOffset, t.endOffset);
+            }
+        }
+    }
+
+    private void checkBracketMatching() {
+        Stack<Token> stack = new Stack<>();
+        for (Token t : code) {
+            switch (t.type) {
+                case LBRACE: case LPAREN: case LBRACKET: stack.push(t); break;
+                case RBRACE: case RPAREN: case RBRACKET:
+                    if (stack.isEmpty()) {
+                        em.addSyntaxError("Unmatched closing '" + t.value + "'", "Remove or add opening '" + mirror(t.value) + "'", t.line, t.column, t.startOffset, t.endOffset);
+                    } else {
+                        Token open = stack.pop();
+                        if (!isPair(open, t)) {
+                            em.addSyntaxError("Mismatched brackets: '" + open.value + "' closed by '" + t.value + "'",
+                                    "Replace with '" + closingOf(open) + "'", t.line, t.column, t.startOffset, t.endOffset);
+                        }
+                    }
+                    break;
+                default: break;
+            }
+        }
+        while (!stack.isEmpty()) {
+            Token open = stack.pop();
+            em.addSyntaxError("Unclosed '" + open.value + "'", "Add closing '" + closingOf(open) + "'", open.line, open.column, open.startOffset, open.endOffset);
+        }
+    }
+
+    private String mirror(String close) { return close.equals("}") ? "{" : close.equals(")") ? "(" : "["; }
+    private String closingOf(Token open) { return open.type == TokenRepository.TokenType.LBRACE ? "}" : open.type == TokenRepository.TokenType.LPAREN ? ")" : "]"; }
+    
+    private boolean isPair(Token open, Token close) {
+        return (open.type == TokenRepository.TokenType.LBRACE && close.type == TokenRepository.TokenType.RBRACE)
+                || (open.type == TokenRepository.TokenType.LPAREN && close.type == TokenRepository.TokenType.RPAREN)
+                || (open.type == TokenRepository.TokenType.LBRACKET && close.type == TokenRepository.TokenType.RBRACKET);
+    }
+
+    private void checkModifierConflicts() {
+        for (int i = 0; i < code.size(); i++) {
+            Token t = code.get(i);
+            if (t.type == TokenRepository.TokenType.ABSTRACT) {
+                for (int j = i + 1; j < Math.min(i + 12, code.size()); j++) {
+                    TokenRepository.TokenType jt = code.get(j).type;
+                    if (jt == TokenRepository.TokenType.FINAL) {
+                        em.addSemanticError("Conflicting modifiers: 'abstract' and 'final'", "Remove one", code.get(j).line, code.get(j).column, code.get(j).startOffset, code.get(j).endOffset);
+                        break;
+                    }
+                    if (jt == TokenRepository.TokenType.IDENTIFIER || jt == TokenRepository.TokenType.LBRACE) break;
+                }
+                for (int j = i + 1; j < Math.min(i + 12, code.size()); j++) {
+                    TokenRepository.TokenType jt = code.get(j).type;
+                    if (jt == TokenRepository.TokenType.STATIC) {
+                        em.addSemanticError("Conflicting modifiers: 'abstract' and 'static'", "Remove one", code.get(j).line, code.get(j).column, code.get(j).startOffset, code.get(j).endOffset);
+                        break;
+                    }
+                    if (jt == TokenRepository.TokenType.IDENTIFIER || jt == TokenRepository.TokenType.LBRACE) break;
+                }
+            }
+        }
+    }
+
+    private void checkDuplicateVariablesInScope() {
+        List<Set<String>> scopeVars = new ArrayList<>();
+        scopeVars.add(new HashSet<>());
+        int depth = 0;
+        int paren = 0;
+        for (int i = 0; i < code.size(); i++) {
+            Token t = code.get(i);
+            if (t.type == TokenRepository.TokenType.LBRACE) {
+                depth++;
+                scopeVars.add(new HashSet<>());
+            } else if (t.type == TokenRepository.TokenType.RBRACE) {
+                if (depth > 0) { scopeVars.remove(depth); depth--; }
+            } else if (t.type == TokenRepository.TokenType.LPAREN) {
+                paren++;
+            } else if (t.type == TokenRepository.TokenType.RPAREN) {
+                if (paren > 0) paren--;
+            }
+            if (depth < 2 || paren > 0) continue;
+            if (t.isType() && i + 2 < code.size()) {
+                Token next = code.get(i + 1);
+                if (next.type == TokenRepository.TokenType.IDENTIFIER) {
+                    TokenRepository.TokenType after = code.get(i + 2).type;
+                    boolean isDecl = after == TokenRepository.TokenType.EQUAL || after == TokenRepository.TokenType.SEMICOLON
+                            || after == TokenRepository.TokenType.COMMA || after == TokenRepository.TokenType.RPAREN
+                            || after == TokenRepository.TokenType.LBRACKET;
+                    if (isDecl && depth < scopeVars.size()) {
+                        String name = next.value;
+                        Set<String> cur = scopeVars.get(depth);
+                        if (cur.contains(name)) {
+                            em.addSemanticError("Duplicate variable '" + name + "' in the same scope", "Rename this variable or reuse the existing one", next.line, next.column, next.startOffset, next.endOffset);
+                        } else {
+                            cur.add(name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void checkClassFieldDuplicates() {
+        int depth = 0, paren = 0;
+        for (int i = 0; i < code.size(); i++) {
+            Token t = code.get(i);
+            if (t.type == TokenRepository.TokenType.LBRACE) {
+                if (depth == 0) classFieldNames.clear();
+                depth++;
+            } else if (t.type == TokenRepository.TokenType.RBRACE) {
+                if (depth > 0) depth--;
+            } else if (t.type == TokenRepository.TokenType.LPAREN) {
+                paren++;
+            } else if (t.type == TokenRepository.TokenType.RPAREN) {
+                if (paren > 0) paren--;
+            }
+            if (depth != 1 || paren > 0) continue;
+            if (t.isType() && i + 1 < code.size()) {
+                Token next = code.get(i + 1);
+                if (next.type == TokenRepository.TokenType.IDENTIFIER && i + 2 < code.size()) {
+                    TokenRepository.TokenType after = code.get(i + 2).type;
+                    boolean isDecl = after == TokenRepository.TokenType.EQUAL || after == TokenRepository.TokenType.SEMICOLON || after == TokenRepository.TokenType.COMMA;
+                    if (isDecl) {
+                        String name = next.value;
+                        if (classFieldNames.contains(name)) {
+                            em.addSemanticError("Duplicate field '" + name + "'", "Rename one of the fields", next.line, next.column, next.startOffset, next.endOffset);
+                        } else {
+                            classFieldNames.add(name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private void checkDivisionByZero() {
+        for (int i = 0; i + 1 < code.size(); i++) {
+            if (code.get(i).type == TokenRepository.TokenType.SLASH) {
+                Token divisor = code.get(i + 1);
+                boolean isZero = false;
+                if (divisor.type == TokenRepository.TokenType.INTEGER_LITERAL) {
+                    isZero = divisor.value.replace("_", "").equals("0");
+                } else if (divisor.type == TokenRepository.TokenType.DOUBLE_LITERAL || divisor.type == TokenRepository.TokenType.FLOAT_LITERAL) {
+                    try { isZero = Double.parseDouble(divisor.value.replaceAll("[fFdDlL]", "")) == 0.0; } catch (NumberFormatException ignored) {}
+                }
+                if (isZero) em.addWarning("Division by zero", "Will throw ArithmeticException at runtime", divisor.line, divisor.column, divisor.startOffset, divisor.endOffset);
+            }
+        }
+    }
+
+    private void checkReturnVoid() {
+        for (int i = 0; i + 1 < code.size(); i++) {
+            if (code.get(i).type == TokenRepository.TokenType.RETURN && code.get(i + 1).type == TokenRepository.TokenType.VOID) {
+                em.addSemanticError("Cannot use 'void' as a return value", "Use  return;  (with no value)", code.get(i + 1).line, code.get(i + 1).column, code.get(i).startOffset, code.get(i + 1).endOffset);
+            }
+        }
+    }
+
+    private void checkEmptyBlocks() {
+        for (int i = 0; i + 1 < code.size(); i++) {
+            if (code.get(i).type == TokenRepository.TokenType.LBRACE && code.get(i + 1).type == TokenRepository.TokenType.RBRACE) {
+                if (i > 0 && (code.get(i - 1).type == TokenRepository.TokenType.RPAREN || code.get(i - 1).type == TokenRepository.TokenType.COMMA
+                        || code.get(i - 1).type == TokenRepository.TokenType.EQUAL || code.get(i - 1).type == TokenRepository.TokenType.NEW)) continue;
+                em.addInfo("Empty block detected", "Consider adding code or a comment inside, e.g.  { /* intentionally empty */ }", code.get(i).line, code.get(i).column, code.get(i).startOffset, code.get(i + 1).endOffset);
+            }
+        }
+    }
+
+    private void checkTypos() {
+        Set<String> dict = new HashSet<>(TokenRepository.getAllKeywords());
+        dict.addAll(TokenRepository.BUILTIN_TYPES);
+        dict.addAll(Arrays.asList("i","j","k","x","y","z","n","s","c","m","v","p","q","r","a","b","d","e","f","g","h",
+                "name","index","count","value","data","result","message","file","path","list","map","set","key","entry",
+                "output","input","number","size","length","position","state","buffer","source","target","element","item","flag",
+                "ignored","ignore","unused"));
+        Map<String, Integer> freq = new HashMap<>();
+        for (Token t : code) { if (t.type == TokenRepository.TokenType.IDENTIFIER) freq.merge(t.value, 1, Integer::sum); }
+        for (Map.Entry<String, Integer> e : freq.entrySet()) { if (e.getValue() > 1) dict.add(e.getKey()); }
+        for (int i = 0; i < code.size(); i++) {
+            Token t = code.get(i);
+            if (t.type != TokenRepository.TokenType.IDENTIFIER) continue;
+            if (dict.contains(t.value) || freq.getOrDefault(t.value, 0) > 1) continue;
+            if (t.value.length() < 5 || Character.isUpperCase(t.value.charAt(0)) || t.value.toUpperCase().equals(t.value)) continue;
+            if (i + 1 < code.size() && (code.get(i + 1).type == TokenRepository.TokenType.LPAREN || code.get(i + 1).type == TokenRepository.TokenType.DOT)) continue;
+            String closest = null; int minDist = Integer.MAX_VALUE;
+            for (String word : dict) {
+                if (Math.abs(word.length() - t.value.length()) > 2) continue;
+                int dist = levenshtein(t.value, word);
+                if (dist < minDist) { minDist = dist; closest = word; }
+            }
+            if (closest != null && minDist == 1) em.addWarning("Possible typo: '" + t.value + "'", "Did you mean '" + closest + "'?", t.line, t.column, t.startOffset, t.endOffset);
+        }
+    }
+
+    private int levenshtein(String a, String b) {
+        int[] costs = new int[b.length() + 1];
+        for (int j = 0; j < costs.length; j++) costs[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            costs[0] = i; int nw = i - 1;
+            for (int j = 1; j <= b.length(); j++) {
+                int cj = Math.min(1 + Math.min(costs[j], costs[j - 1]), a.charAt(i - 1) == b.charAt(j - 1) ? nw : nw + 1);
+                nw = costs[j]; costs[j] = cj;
+            }
+        }
+        return costs[b.length()];
+    }
+
+    private void checkStringEquality() {
+        for (int i = 1; i + 1 < code.size(); i++) {
+            if (code.get(i).type == TokenRepository.TokenType.EQUAL_EQUAL || code.get(i).type == TokenRepository.TokenType.NOT_EQUAL) {
+                if (code.get(i + 1).type == TokenRepository.TokenType.STRING_LITERAL)
+                    em.addWarning("Comparing String with '==' or '!=' may give unexpected results", "Use .equals() instead", code.get(i).line, code.get(i).column, code.get(i).startOffset, code.get(i).endOffset);
+            }
+        }
+    }
+
+    private void checkNullToPrimitive() {
+        Set<String> primitives = new HashSet<>(Arrays.asList("byte","short","int","long","float","double","boolean","char"));
+        for (int i = 1; i + 2 < code.size(); i++) {
+            if (code.get(i).type == TokenRepository.TokenType.EQUAL && code.get(i - 1).type == TokenRepository.TokenType.IDENTIFIER) {
+                Token typeTok = i - 2 >= 0 ? code.get(i - 2) : null;
+                if (typeTok != null && primitives.contains(typeTok.value) && code.get(i + 1).type == TokenRepository.TokenType.NULL)
+                    em.addError("Cannot assign null to primitive type '" + typeTok.value + "'", "Use a default value instead (e.g. 0)", code.get(i + 1).line, code.get(i + 1).column, code.get(i + 1).startOffset, code.get(i + 1).endOffset, CodeError.Severity.ERROR);
+            }
+        }
+    }
+
+    private void checkInfiniteWhileTrue() {
+        for (int i = 0; i + 3 < code.size(); i++) {
+            if (code.get(i).value.equals("while") && code.get(i + 1).type == TokenRepository.TokenType.LPAREN
+                    && code.get(i + 2).value.equals("true") && code.get(i + 3).type == TokenRepository.TokenType.RPAREN) {
+                int j = i + 4;
+                if (j < code.size() && code.get(j).type == TokenRepository.TokenType.LBRACE) {
+                    int depth = 1, k = j + 1;
+                    boolean hasExit = false;
+                    while (k < code.size() && depth > 0) {
+                        if (code.get(k).type == TokenRepository.TokenType.LBRACE) depth++;
+                        else if (code.get(k).type == TokenRepository.TokenType.RBRACE) depth--;
+                        else if (code.get(k).value.equals("break") || code.get(k).value.equals("return")) { hasExit = true; break; }
+                        k++;
+                    }
+                    if (!hasExit) em.addWarning("Possible infinite loop: 'while(true)' with no break or return inside", "Add a break or return to exit the loop", code.get(i).line, code.get(i).column, code.get(i).startOffset, code.get(i).endOffset);
+                }
+            }
+        }
+    }
+
+    private void checkEmptyCatchBlocks() {
+        for (int i = 0; i + 1 < code.size(); i++) {
+            if (code.get(i).value.equals("catch") && code.get(i + 1).type == TokenRepository.TokenType.LPAREN) {
+                int j = i + 1;
+                while (j < code.size() && code.get(j).type != TokenRepository.TokenType.RPAREN) j++;
+                j++;
+                if (j < code.size() && code.get(j).type == TokenRepository.TokenType.LBRACE && j + 1 < code.size() && code.get(j + 1).type == TokenRepository.TokenType.RBRACE) {
+                    int nameIdx = j - 2;
+                    if (nameIdx > i && code.get(nameIdx).type == TokenRepository.TokenType.IDENTIFIER) {
+                        String name = code.get(nameIdx).value;
+                        if (name.equals("ignored") || name.equals("ignore") || name.equals("unused")) continue;
+                    }
+                    em.addWarning("Empty catch block — exception is silently swallowed", "Log the exception or handle it explicitly", code.get(j).line, code.get(j).column, code.get(j).startOffset, code.get(j + 1).endOffset);
+                }
+            }
+        }
+    }
+
+    private void validateImports() {
+        String[] lines = source.split("\n");
+        for (int i = 0; i < lines.length; i++) {
+            String ln = lines[i].trim();
+            if (ln.startsWith("import ")) {
+                Matcher imp = Pattern.compile("import\\s+(static\\s+)?([a-zA-Z0-9_.]+)(\\.\\*)?\\s*;").matcher(ln);
+                if (imp.find()) {
+                    String pkgClass = imp.group(2);
+                    String pkg = imp.group(3) != null ? pkgClass : (pkgClass.contains(".") ? pkgClass.substring(0, pkgClass.lastIndexOf('.')) : pkgClass);
+                    if (pkg.startsWith("java.") || pkg.startsWith("javax.") || pkg.startsWith("org.")) continue;
+                }
+            }
+        }
+    }
+}
+
+class JavaErrorChecker {
+    private final ErrorManager em = new ErrorManager();
+
+    public ErrorManager checkCode(String src) {
+        em.clear();
+        if (src == null || src.trim().isEmpty()) { 
+            em.addInfo("No code to check", "Open or create a Java file to begin", 1, 1, 0, 0); 
+            return em; 
+        }
+        try {
+            JavaLexer lexer = new JavaLexer(src);
+            List<Token> tokens = lexer.tokenize();
+            JavaParser parser = new JavaParser(tokens, em);
+            ASTNode ast = parser.parse();
+            SemanticAnalyzer sa = new SemanticAnalyzer(src, tokens, ast, em);
+            sa.analyze();
+        } catch (Exception ex) {
+            em.addError("Internal analysis error: " + ex.getMessage(), "Please report this issue", 0, 0, 0, 0, CodeError.Severity.ERROR);
+        }
+        return em;
+    }
+}
+
+// ============================================================================
+// SYNTAX HIGHLIGHTER – Jitter‑free: static styles, no bold/italic
+// ============================================================================
+class SyntaxHighlighter {
+    private static final Set<String> keywords = TokenRepository.getAllKeywords();
+    private static final Set<String> typeNames = new HashSet<>(Arrays.asList(
+        "byte","short","int","long","float","double","boolean","char","void",
+        "String","Object","System","Integer","Double","Float","Long","Boolean",
+        "Character","StringBuilder","Scanner","List","Map","Set","Arrays"
+    ));
+    private static final Pattern TOKEN_PATTERN = Pattern.compile(
+        "/\\*(?:[^*]|\\*[^/])*\\*/|//[^\n]*|@[a-zA-Z_][a-zA-Z0-9_.]*|\"\"\"(?:[^\"\\\\]|\\\\.)*\"\"\"|\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)'|\\b0[xX][0-9a-fA-F_]+[lL]?\\b|\\b\\d[\\d_]*\\.?[\\d_]*(?:[eE][+-]?[\\d_]+)?[fFdDlL]?\\b|\\b[a-zA-Z_$][a-zA-Z0-9_$]*\\b"
+    );
+
+    // styles created once and shared
+    private static Style defaultStyle;
+    private static Style keywordStyle;
+    private static Style typeStyle;
+    private static Style stringStyle;
+    private static Style numberStyle;
+    private static Style commentStyle;
+    private static Style annotationStyle;
+
+    public static void initStyles(JTextPane pane) {
+        if (defaultStyle == null) {
+            defaultStyle = pane.addStyle("def", null);
+            StyleConstants.setForeground(defaultStyle, Theme.TEXT_MAIN);
+
+            keywordStyle = pane.addStyle("kw", null);
+            StyleConstants.setForeground(keywordStyle, Theme.KEYWORD_COLOR);
+
+            typeStyle = pane.addStyle("ty", null);
+            StyleConstants.setForeground(typeStyle, Theme.TYPE_COLOR);
+
+            stringStyle = pane.addStyle("str", null);
+            StyleConstants.setForeground(stringStyle, Theme.STRING_COLOR);
+
+            numberStyle = pane.addStyle("num", null);
+            StyleConstants.setForeground(numberStyle, Theme.NUMBER_COLOR);
+
+            commentStyle = pane.addStyle("cmt", null);
+            StyleConstants.setForeground(commentStyle, Theme.COMMENT_COLOR);
+
+            annotationStyle = pane.addStyle("ann", null);
+            StyleConstants.setForeground(annotationStyle, Theme.ANNOTATION_COLOR);
+        }
+    }
+
+    public static void applyHighlighting(JTextPane pane) {
+        initStyles(pane);
+        StyledDocument doc = pane.getStyledDocument();
+        String text;
+        try { text = doc.getText(0, doc.getLength()); } catch (BadLocationException e) { return; }
+
+        // reset everything to default look – merge, no geometry recalc
+        doc.setCharacterAttributes(0, text.length(), defaultStyle, false);
+
+        Matcher m = TOKEN_PATTERN.matcher(text);
+        while (m.find()) {
+            String tok = m.group();
+            int s = m.start();
+            int l = tok.length();
+            Style style = null;
+
+            if (tok.startsWith("//") || tok.startsWith("/*")) {
+                style = commentStyle;
+            } else if (tok.startsWith("@")) {
+                style = annotationStyle;
+            } else if (tok.startsWith("\"") || tok.startsWith("'")) {
+                style = stringStyle;
+            } else if (Character.isDigit(tok.charAt(0))) {
+                style = numberStyle;
+            } else if (keywords.contains(tok)) {
+                style = typeNames.contains(tok) ? typeStyle : keywordStyle;
+            }
+
+            if (style != null) {
+                doc.setCharacterAttributes(s, l, style, false);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// CODE EDITOR – jitter‑resistant line numbers, slower timer, DISABLED WORD-WRAP
+// ============================================================================
+class CodeEditor extends JPanel {
+    public final JTextPane textPane;
+    private final JTextPane lineNumbers;
+    private final UndoManager undoManager = new UndoManager();
+    private List<CodeError> currentErrors = new ArrayList<>();
+    private final javax.swing.Timer highlightTimer;
+    private int lastLineCount = -1;
+
+    public CodeEditor() {
+        setLayout(new BorderLayout());
+        setBackground(Theme.APP_BG);
+
+        textPane = new JTextPane() {
+            // FIX: Disables automatic word wrapping. Prevents vertical bouncing/jittering!
+            @Override
+            public boolean getScrollableTracksViewportWidth() {
+                Component parent = getParent();
+                ComponentUI ui = getUI();
+                return parent != null ? (ui.getPreferredSize(this).width <= parent.getSize().width) : true;
+            }
+
+            @Override protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                drawErrorUnderlines(g);
+            }
+        };
+        textPane.setFont(Theme.CODE_FONT);
+        textPane.setBackground(Theme.APP_BG);
+        textPane.setForeground(Theme.TEXT_MAIN);
+        textPane.setCaretColor(Theme.TEXT_MAIN);
+        textPane.setSelectionColor(new Color(0x44475a));
+        textPane.setSelectedTextColor(Theme.TEXT_MAIN);
+        textPane.setBorder(BorderFactory.createEmptyBorder(4, 10, 4, 8));
+        textPane.getDocument().addUndoableEditListener(e -> {
+            if (!"style change".equals(e.getEdit().getPresentationName())) {
+                undoManager.addEdit(e.getEdit());
+            }
+        });
+
+        lineNumbers = new JTextPane();
+        lineNumbers.setFont(Theme.CODE_FONT);
+        lineNumbers.setBackground(Theme.SURFACE_COLOR);
+        lineNumbers.setForeground(Theme.TEXT_MUTED);
+        lineNumbers.setEditable(false);
+        lineNumbers.setFocusable(false);
+        lineNumbers.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 8));
+        
+        // Lock width so it can never grow/shrink and push the text area
+        FontMetrics fm = lineNumbers.getFontMetrics(Theme.CODE_FONT);
+        int lineNumWidth = fm.stringWidth("9999") + 16;
+        Dimension fixedWidth = new Dimension(lineNumWidth, 0);
+        lineNumbers.setPreferredSize(fixedWidth);
+        lineNumbers.setMinimumSize(fixedWidth);
+        lineNumbers.setMaximumSize(new Dimension(lineNumWidth, Integer.MAX_VALUE));
+        updateLineNumbers();
+
+        JScrollPane scroll = new JScrollPane(textPane);
+        scroll.setRowHeaderView(lineNumbers);
+        scroll.setBorder(null);
+        scroll.getViewport().setBackground(Theme.APP_BG);
+        add(scroll, BorderLayout.CENTER);
+
+        // slower timer, still debounced
+        highlightTimer = new javax.swing.Timer(500, e -> SwingUtilities.invokeLater(() -> {
+            updateLineNumbers();
+            SyntaxHighlighter.applyHighlighting(textPane);
+        }));
+        highlightTimer.setRepeats(false);
+
+        textPane.getDocument().addDocumentListener(new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent e) { onChange(); }
+            @Override public void removeUpdate(DocumentEvent e) { onChange(); }
+            @Override public void changedUpdate(DocumentEvent e) {}
+        });
+    }
+
+    private void onChange() {
+        if (highlightTimer.isRunning()) {
+            highlightTimer.restart();
+        } else {
+            highlightTimer.start();
+        }
+    }
+
+    private void updateLineNumbers() {
+        int lines = textPane.getDocument().getDefaultRootElement().getElementCount();
+        if (lines == lastLineCount) return;
+        lastLineCount = lines;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 1; i <= lines; i++) sb.append(i).append("\n");
+        lineNumbers.setText(sb.toString());
+    }
+
+    private void drawErrorUnderlines(Graphics g) {
+        if (currentErrors.isEmpty()) return;
+        Graphics2D g2 = (Graphics2D) g.create();
+        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        int docLen = textPane.getDocument().getLength();
+        for (CodeError err : currentErrors) {
+            if (err.startOffset >= docLen) continue;
+            try {
+                int s = Math.min(err.startOffset, docLen - 1);
+                int e = Math.min(err.endOffset > s ? err.endOffset : s + 1, docLen);
+                Rectangle sr = textPane.modelToView2D(s).getBounds();
+                Rectangle er = textPane.modelToView2D(e).getBounds();
+                int x1 = sr.x, x2 = er.x > x1 ? er.x : x1 + 40;
+                int y = sr.y + sr.height;
+                Color col = err.severity == CodeError.Severity.ERROR ? Theme.DANGER_COLOR :
+                            err.severity == CodeError.Severity.WARNING ? Theme.WARNING_COLOR :
+                            err.severity == CodeError.Severity.INFO ? Theme.TEXT_MUTED : Theme.CYAN_COLOR;
+                g2.setColor(col);
+                g2.setStroke(new BasicStroke(1.5f));
+                boolean up = true;
+                for (int xp = x1; xp < Math.min(x2, textPane.getWidth() - 4); xp += 4) {
+                    g2.drawLine(xp, y + (up ? -2 : 0), Math.min(xp + 4, x2), y + (up ? 0 : -2));
+                    up = !up;
+                }
+            } catch (BadLocationException ignore) {}
+        }
+        g2.dispose();
+    }
+
+    public void setErrors(List<CodeError> errors) {
+        this.currentErrors = errors != null ? errors : new ArrayList<>();
+        textPane.repaint();
+    }
+
+    public void clearErrors() { setErrors(null); }
+
+    public void undo() { if (undoManager.canUndo()) undoManager.undo(); }
+    public void redo() { if (undoManager.canRedo()) undoManager.redo(); }
+
+    public int getCurrentLine() {
+        int pos = textPane.getCaretPosition();
+        return textPane.getDocument().getDefaultRootElement().getElementIndex(pos) + 1;
+    }
+
+    public void goToLine(int line) {
+        try {
+            Element root = textPane.getDocument().getDefaultRootElement();
+            if (line > 0 && line <= root.getElementCount()) {
+                textPane.setCaretPosition(root.getElement(line - 1).getStartOffset());
+                textPane.requestFocus();
+            }
+        } catch (Exception ignore) {}
+    }
+
+    public void toggleLineComment() {
+        try {
+            int line = getCurrentLine();
+            Element elem = textPane.getDocument().getDefaultRootElement().getElement(line - 1);
+            int s = elem.getStartOffset(), e = elem.getEndOffset();
+            String txt = textPane.getDocument().getText(s, e - s);
+            if (txt.trim().startsWith("//")) {
+                textPane.getDocument().remove(s + txt.indexOf("//"), 2);
+            } else {
+                textPane.getDocument().insertString(s, "//", null);
+            }
+        } catch (BadLocationException ignore) {}
+    }
+}
+
+// ============================================================================
+// FILE EXPLORER – NO EMOJIS, USING ONLY VECTORS
+// ============================================================================
+class FileExplorer extends JPanel {
+    private final JTree fileTree;
+    private final DefaultMutableTreeNode rootNode;
+    private DefaultTreeModel treeModel;
+    private final java.util.function.Consumer<File> openCb;
+    private File currentDir;
+
+    public FileExplorer(java.util.function.Consumer<File> openCb) {
+        this.openCb = openCb;
+        setLayout(new BorderLayout());
+        setBackground(Theme.SIDEBAR_COLOR);
+        setPreferredSize(new Dimension(220, 0));
+
+        JPanel hdr = new JPanel(new BorderLayout());
+        hdr.setBackground(Theme.SURFACE_COLOR);
+        hdr.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.BORDER_COLOR),
+            BorderFactory.createEmptyBorder(8, 12, 6, 8)));
+            
+        JLabel title = new JLabel("FILES");
+        title.setFont(Theme.UI_FONT_BOLD);
+        title.setForeground(Theme.TEXT_MUTED);
+        
+        JButton openBtn = new JButton("Open Folder");
+        openBtn.setFont(Theme.UI_FONT_SMALL);
+        openBtn.setForeground(Theme.PRIMARY_COLOR);
+        openBtn.setBackground(Theme.SURFACE_COLOR);
+        openBtn.setBorder(BorderFactory.createEmptyBorder(2, 6, 2, 6));
+        openBtn.setFocusPainted(false);
+        openBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        openBtn.addActionListener(e -> chooseFolder());
+        
+        hdr.add(title, BorderLayout.WEST);
+        hdr.add(openBtn, BorderLayout.EAST);
+
+        rootNode = new DefaultMutableTreeNode("Files");
+        treeModel = new DefaultTreeModel(rootNode);
+        
+        fileTree = new JTree(treeModel);
+        fileTree.setRootVisible(false);
+        fileTree.setShowsRootHandles(true);
+        fileTree.setBackground(Theme.SIDEBAR_COLOR);
+        fileTree.setForeground(Theme.TEXT_MAIN);
+        fileTree.setFont(Theme.UI_FONT_SMALL);
+        fileTree.setRowHeight(24);
+        fileTree.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+
+        fileTree.setUI(new BasicTreeUI() {
+            @Override public Icon getExpandedIcon() { return new VectorIcon(VectorIcon.Type.ARROW_DOWN, 12, Theme.TEXT_MUTED); }
+            @Override public Icon getCollapsedIcon() { return new VectorIcon(VectorIcon.Type.ARROW_RIGHT, 12, Theme.TEXT_MUTED); }
+        });
+
+        fileTree.setCellRenderer(new DefaultTreeCellRenderer() {
+            @Override
+            public Component getTreeCellRendererComponent(JTree tr, Object v, boolean sel, boolean exp, boolean leaf, int row, boolean focus) {
+                super.getTreeCellRendererComponent(tr, v, sel, exp, leaf, row, focus);
+                setBackground(sel ? Theme.CURRENT_LINE : Theme.SIDEBAR_COLOR);
+                setOpaque(true);
+                setBorder(BorderFactory.createEmptyBorder(1, 2, 1, 2));
+                
+                if (v instanceof DefaultMutableTreeNode) {
+                    Object o = ((DefaultMutableTreeNode) v).getUserObject();
+                    if (o instanceof File) {
+                        File f = (File) o;
+                        
+                        // ONLY the text name, NO emojis. 
+                        setText(f.getName());
+                        
+                        boolean isDir = f.isDirectory();
+                        setForeground(isDir ? Theme.CYAN_COLOR : f.getName().endsWith(".java") ? Theme.PRIMARY_COLOR : Theme.TEXT_MUTED);
+                        
+                        // USE VECTOR ICONS INSTEAD
+                        VectorIcon.Type iconType = isDir ? VectorIcon.Type.FOLDER : VectorIcon.Type.FILE;
+                        Color iconColor = isDir ? Theme.CYAN_COLOR : Theme.TEXT_MUTED;
+                        setIcon(new VectorIcon(iconType, 14, iconColor));
+                    }
+                }
+                return this;
+            }
+        });
+
+        fileTree.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    DefaultMutableTreeNode node = (DefaultMutableTreeNode) fileTree.getLastSelectedPathComponent();
+                    if (node != null && node.getUserObject() instanceof File) {
+                        File f = (File) node.getUserObject();
+                        if (f.isFile()) openCb.accept(f);
+                    }
+                }
+            }
+        });
+
+        JScrollPane scroll = new JScrollPane(fileTree);
+        scroll.setBorder(null);
+        scroll.getViewport().setBackground(Theme.SIDEBAR_COLOR);
+        
+        add(hdr, BorderLayout.NORTH);
+        add(scroll, BorderLayout.CENTER);
+    }
+
+    private void chooseFolder() {
+        JFileChooser fc = new JFileChooser(currentDir);
+        Theme.themeFileChooser(fc);
+        fc.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+        fc.setDialogTitle("Open Folder");
+        if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            setDirectory(fc.getSelectedFile());
+        }
+    }
+
+    public void setDirectory(File dir) {
+        this.currentDir = dir;
+        rootNode.removeAllChildren();
+        if (dir != null && dir.isDirectory()) populate(dir, rootNode);
+        treeModel.reload();
+        for (int i = 0; i < fileTree.getRowCount(); i++) fileTree.expandRow(i);
+    }
+
+    private void populate(File dir, DefaultMutableTreeNode parent) {
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        Arrays.sort(files, (a, b) -> {
+            if (a.isDirectory() && !b.isDirectory()) return -1;
+            if (!a.isDirectory() && b.isDirectory()) return 1;
+            return a.getName().compareToIgnoreCase(b.getName());
+        });
+        for (File f : files) {
+            if (!f.isHidden() && (f.isDirectory() || f.getName().endsWith(".java"))) {
+                DefaultMutableTreeNode node = new DefaultMutableTreeNode(f);
+                parent.add(node);
+                if (f.isDirectory()) populate(f, node);
+            }
+        }
+    }
+}
+
+// ============================================================================
+// TERMINAL PANEL
+// ============================================================================
+class TerminalPanel extends JPanel {
+    private final JTextPane area;
+    private final JLabel titleLabel;
+    private CodeEditor currentEditor;
+
+    public TerminalPanel() {
+        setLayout(new BorderLayout());
+        JPanel hdr = new JPanel(new BorderLayout());
+        hdr.setBackground(Theme.SURFACE_COLOR);
+        hdr.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(1, 0, 0, 0, Theme.BORDER_COLOR),
+            BorderFactory.createEmptyBorder(5, 12, 5, 12)));
+        titleLabel = new JLabel("ISSUES");
+        titleLabel.setFont(Theme.UI_FONT_BOLD);
+        titleLabel.setForeground(Theme.TEXT_MUTED);
+        JButton clearBtn = new JButton("Clear");
+        clearBtn.setFont(Theme.UI_FONT_SMALL);
+        clearBtn.setForeground(Theme.TEXT_MUTED);
+        clearBtn.setBackground(Theme.SURFACE_COLOR);
+        clearBtn.setBorder(BorderFactory.createEmptyBorder(2, 8, 2, 8));
+        clearBtn.setFocusPainted(false);
+        clearBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        clearBtn.addActionListener(e -> clear());
+        hdr.add(titleLabel, BorderLayout.WEST);
+        hdr.add(clearBtn, BorderLayout.EAST);
+
+        area = new JTextPane();
+        area.setEditable(false);
+        area.setFont(Theme.TERMINAL_FONT);
+        area.setBackground(new Color(0x1a1b23));
+        area.setForeground(Theme.TEXT_MAIN);
+        area.setBorder(BorderFactory.createEmptyBorder(10, 14, 10, 14));
+        area.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) { handleClick(e); }
+        });
+        area.addMouseMotionListener(new MouseMotionAdapter() {
+            @Override public void mouseMoved(MouseEvent e) {
+                area.setCursor(isOverLink(e) ? Cursor.getPredefinedCursor(Cursor.HAND_CURSOR) : Cursor.getDefaultCursor());
+            }
+        });
+
+        JScrollPane scroll = new JScrollPane(area);
+        scroll.setBorder(null);
+        scroll.setPreferredSize(new Dimension(0, 195));
+        add(hdr, BorderLayout.NORTH);
+        add(scroll, BorderLayout.CENTER);
+    }
+
+    public void setCurrentEditor(CodeEditor ed) { this.currentEditor = ed; }
+
+    public void displayErrors(ErrorManager em) {
+        area.setText("");
+        StyledDocument doc = area.getStyledDocument();
+        Style plain = mkStyle(area, "plain", Theme.TEXT_MAIN, false, false);
+        Style muted = mkStyle(area, "muted", Theme.TEXT_MUTED, false, true);
+        Style errS = mkStyle(area, "err", Theme.DANGER_COLOR, true, false);
+        Style warnS = mkStyle(area, "warn", Theme.WARNING_COLOR, true, false);
+        Style infoS = mkStyle(area, "info", new Color(0x8be9fd), false, false);
+        Style hintS = mkStyle(area, "hint", Theme.TEXT_MUTED, false, true);
+        Style okS = mkStyle(area, "ok", Theme.SUCCESS_COLOR, true, false);
+        Style headS = mkStyle(area, "head", Theme.PRIMARY_COLOR, true, false);
+        List<CodeError> all = em.getErrors();
+
+        try {
+            if (all.isEmpty()) {
+                ins(doc, "  ✓  No issues found — your code looks good!\n\n", okS);
+                ins(doc, "  Tip: Press Ctrl+Enter any time to re-check after editing.\n", muted);
+                updateTitle(0, 0, 0);
+                return;
+            }
+            int ec = em.getErrorCount(), wc = em.getWarningCount(), ic = em.getInfoCount();
+            ins(doc, "  Java Check Results  —  ", headS);
+            if (ec > 0) ins(doc, ec + " error" + (ec > 1 ? "s" : "") + "  ", errS);
+            if (wc > 0) ins(doc, wc + " warning" + (wc > 1 ? "s" : "") + "  ", warnS);
+            if (ic > 0) ins(doc, ic + " hint" + (ic > 1 ? "s" : ""), infoS);
+            ins(doc, "\n", plain);
+            ins(doc, "  Click any line number to jump to it in the editor.\n", muted);
+            ins(doc, "  ─────────────────────────────────────────────────\n\n", muted);
+
+            List<CodeError> errors   = filterBy(all, CodeError.Severity.ERROR);
+            List<CodeError> warnings = filterBy(all, CodeError.Severity.WARNING);
+            List<CodeError> infos    = filterBy(all, CodeError.Severity.INFO);
+            List<CodeError> hints    = filterBy(all, CodeError.Severity.HINT);
+
+            if (!errors.isEmpty()) { ins(doc, "  ERRORS\n", errS); for (CodeError e : errors) printEntry(doc, "✗", e, errS, hintS, plain); ins(doc, "\n", plain); }
+            if (!warnings.isEmpty()) { ins(doc, "  WARNINGS\n", warnS); for (CodeError e : warnings) printEntry(doc, "⚠", e, warnS, hintS, plain); ins(doc, "\n", plain); }
+            if (!infos.isEmpty()) { ins(doc, "  INFO\n", infoS); for (CodeError e : infos) printEntry(doc, "ℹ", e, infoS, hintS, plain); ins(doc, "\n", plain); }
+            if (!hints.isEmpty()) { ins(doc, "  HINTS\n", hintS); for (CodeError e : hints) printEntry(doc, "→", e, hintS, hintS, plain); }
+            updateTitle(ec, wc, ic);
+        } catch (BadLocationException ex) {
+            area.setText("Display error: " + ex.getMessage());
+        }
+    }
+
+    private void printEntry(StyledDocument doc, String icon, CodeError e, Style primary, Style hintSty, Style plain) throws BadLocationException {
+        ins(doc, "  " + icon + "  ", primary);
+        ins(doc, String.format("Line %4d", e.line), primary);
+        ins(doc, ":  " + e.message + "\n", plain);
+        if (e.hint != null && !e.hint.isEmpty()) ins(doc, "          Fix: " + e.hint + "\n", hintSty);
+    }
+
+    private List<CodeError> filterBy(List<CodeError> all, CodeError.Severity sev) {
+        List<CodeError> out = new ArrayList<>();
+        for (CodeError e : all) if (e.severity == sev) out.add(e);
+        return out;
+    }
+
+    private void ins(StyledDocument doc, String text, Style style) throws BadLocationException {
+        doc.insertString(doc.getLength(), text, style);
+    }
+
+    private Style mkStyle(JTextPane p, String name, Color fg, boolean bold, boolean italic) {
+        Style s = p.addStyle(name, null);
+        StyleConstants.setForeground(s, fg);
+        StyleConstants.setFontFamily(s, "Consolas");
+        StyleConstants.setFontSize(s, 13);
+        StyleConstants.setBold(s, bold);
+        StyleConstants.setItalic(s, italic);
+        return s;
+    }
+
+    private void updateTitle(int e, int w, int i) {
+        titleLabel.setText(e == 0 && w == 0 && i == 0 ? "ISSUES" : "ISSUES — " + e + " error" + (e != 1 ? "s" : "") + ", " + w + " warning" + (w != 1 ? "s" : ""));
+    }
+
+    private void handleClick(MouseEvent e) {
+        if (currentEditor == null) return;
+        int off = area.viewToModel2D(e.getPoint());
+        try {
+            Element root = area.getDocument().getDefaultRootElement();
+            int idx = root.getElementIndex(off);
+            Element el = root.getElement(idx);
+            String txt = area.getDocument().getText(el.getStartOffset(), el.getEndOffset() - el.getStartOffset());
+            Matcher m = Pattern.compile("Line\\s+(\\d+)").matcher(txt);
+            if (m.find()) currentEditor.goToLine(Integer.parseInt(m.group(1)));
+        } catch (BadLocationException ignore) {}
+    }
+
+    private boolean isOverLink(MouseEvent e) {
+        int off = area.viewToModel2D(e.getPoint());
+        try {
+            Element root = area.getDocument().getDefaultRootElement();
+            Element el = root.getElement(root.getElementIndex(off));
+            String txt = area.getDocument().getText(el.getStartOffset(), el.getEndOffset() - el.getStartOffset());
+            return Pattern.compile("Line\\s+\\d+").matcher(txt).find();
+        } catch (BadLocationException ignore) { return false; }
+    }
+
+    public void clear() {
+        area.setText("");
+        titleLabel.setText("ISSUES");
+    }
+}
+
+// ============================================================================
+// MAIN IDE FRAME 
+// ============================================================================
+public class JavaErrorCheckerIDE extends JFrame {
+
+    private CardLayout    cardLayout;
+    private JPanel        rootPanel;
+    private JTabbedPane   tabbedPane;
+    private CodeEditor    currentEditor;
+    private TerminalPanel terminalPanel;
+    private JLabel        statusLabel, cursorLabel;
+    private FileExplorer  fileExplorer;
+    private JSplitPane    mainSplit;
+    private boolean       sidebarVisible = true;
+    private final Map<CodeEditor, File> editorFiles = new HashMap<>();
+    private final JavaErrorChecker checker = new JavaErrorChecker();
+
+    public JavaErrorCheckerIDE() {
+        setTitle("Java Error Checker IDE");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(1400, 900);
+        setLocationRelativeTo(null);
+        setMinimumSize(new Dimension(800, 600));
+        cardLayout = new CardLayout();
+        rootPanel  = new JPanel(cardLayout);
+        rootPanel.setBackground(Theme.APP_BG);
+        rootPanel.add(buildWelcome(), "WELCOME");
+        rootPanel.add(buildMain(),    "MAIN");
+        setContentPane(rootPanel);
+        setupKeys();
+        cardLayout.show(rootPanel, "WELCOME");
+    }
+
+    private JPanel buildWelcome() {
+        JPanel panel = new JPanel(new GridBagLayout());
+        panel.setBackground(Theme.APP_BG);
+        JPanel content = new JPanel();
+        content.setLayout(new BoxLayout(content, BoxLayout.Y_AXIS));
+        content.setBackground(Theme.APP_BG);
+
+        JPanel logo = new JPanel() {
+            @Override protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                int cx = getWidth() / 2, cy = getHeight() / 2;
+                g2.setStroke(new BasicStroke(12f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.setColor(new Color(86, 182, 194));
+                g2.drawPolyline(new int[]{cx - 20, cx - 60, cx - 20}, new int[]{cy - 40, cy, cy + 40}, 3);
+                g2.setColor(new Color(198, 120, 221));
+                g2.drawLine(cx + 15, cy - 45, cx - 15, cy + 45);
+                g2.setColor(new Color(97, 175, 239));
+                g2.drawPolyline(new int[]{cx + 20, cx + 60, cx + 20}, new int[]{cy - 40, cy, cy + 40}, 3);
+                g2.dispose();
+            }
+        };
+        logo.setPreferredSize(new Dimension(200, 120));
+        logo.setMaximumSize(new Dimension(200, 120));
+        logo.setOpaque(false);
+        logo.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel title = new JLabel("Java Error Checker");
+        title.setFont(new Font("Segoe UI", Font.BOLD, 42));
+        title.setForeground(Color.WHITE);
+        title.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JLabel sub = new JLabel("A modern syntax and semantic analysis engine for source code");
+        sub.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        sub.setForeground(new Color(150, 150, 150));
+        sub.setAlignmentX(Component.CENTER_ALIGNMENT);
+
+        JButton enter = new JButton("Launch Workspace");
+        enter.setBackground(Theme.PRIMARY_COLOR);
+        enter.setForeground(Color.WHITE);
+        enter.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        enter.setFocusPainted(false);
+        enter.setOpaque(true);
+        enter.setBorderPainted(false);
+        enter.setBorder(BorderFactory.createEmptyBorder(12, 40, 12, 40));
+        enter.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        enter.setAlignmentX(Component.CENTER_ALIGNMENT);
+        enter.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent e) { enter.setBackground(Theme.PRIMARY_HOVER); }
+            public void mouseExited(MouseEvent e)  { enter.setBackground(Theme.PRIMARY_COLOR); }
+        });
+        enter.addActionListener(e -> { cardLayout.show(rootPanel, "MAIN"); newFile(); });
+
+        content.add(logo); content.add(Box.createVerticalStrut(10));
+        content.add(title); content.add(Box.createVerticalStrut(15));
+        content.add(sub); content.add(Box.createVerticalStrut(40));
+        content.add(enter);
+        panel.add(content);
+        return panel;
+    }
+
+    private JPanel buildMain() {
+        JPanel main = new JPanel(new BorderLayout());
+        main.setBackground(Theme.APP_BG);
+        main.add(buildToolbar(), BorderLayout.NORTH);
+
+        fileExplorer = new FileExplorer(this::openFromExplorer);
+
+        tabbedPane = new JTabbedPane(JTabbedPane.TOP);
+        tabbedPane.setFont(Theme.UI_FONT_SMALL);
+        tabbedPane.setBackground(Theme.SURFACE_COLOR);
+        tabbedPane.setBorder(null);
+        tabbedPane.setUI(new BasicTabbedPaneUI() {
+            @Override protected void paintTabBackground(Graphics g, int tabPlacement, int tabIndex, int x, int y, int w, int h, boolean isSelected) {
+                g.setColor(isSelected ? Theme.TAB_SELECTED_BG : Theme.TAB_UNSELECTED_BG);
+                g.fillRect(x, y, w, h);
+            }
+            @Override protected void paintTabBorder(Graphics g, int tabPlacement, int tabIndex, int x, int y, int w, int h, boolean isSelected) {
+                g.setColor(isSelected ? Theme.TAB_SELECTED_BG : Theme.BORDER_COLOR);
+                g.drawRect(x, y, w - 1, h - 1);
+            }
+            @Override protected void paintFocusIndicator(Graphics g, int tabPlacement, Rectangle[] rects, int tabIndex, Rectangle iconRect, Rectangle textRect, boolean isSelected) {}
+            @Override protected int getTabRunOverlay(int tabRunOverlay) { return 0; }
+            @Override protected Insets getTabInsets(int tabPlacement, int tabIndex) { return new Insets(5, 10, 5, 8); }
+        });
+        tabbedPane.addChangeListener(e -> {
+            Component c = tabbedPane.getSelectedComponent();
+            if (c instanceof CodeEditor) {
+                currentEditor = (CodeEditor) c;
+                terminalPanel.setCurrentEditor(currentEditor);
+            }
+            updateTabColors();
+        });
+
+        mainSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, fileExplorer, tabbedPane);
+        mainSplit.setBorder(null);
+        mainSplit.setDividerSize(1);
+        mainSplit.setDividerLocation(220);
+
+        terminalPanel = new TerminalPanel();
+        JSplitPane vSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, mainSplit, terminalPanel);
+        vSplit.setResizeWeight(0.75);
+        vSplit.setBorder(null);
+        vSplit.setDividerSize(1);
+        main.add(vSplit, BorderLayout.CENTER);
+
+        JPanel bar = new JPanel(new BorderLayout());
+        bar.setBackground(new Color(0x1d3557));
+        bar.setBorder(BorderFactory.createEmptyBorder(3, 12, 3, 12));
+        statusLabel = new JLabel("Ready");
+        statusLabel.setForeground(new Color(0xa8c6e8));
+        statusLabel.setFont(Theme.UI_FONT_SMALL);
+        cursorLabel = new JLabel("Ln 1, Col 1");
+        cursorLabel.setForeground(new Color(0xa8c6e8));
+        cursorLabel.setFont(Theme.UI_FONT_SMALL);
+        bar.add(statusLabel, BorderLayout.WEST);
+        bar.add(cursorLabel, BorderLayout.EAST);
+        main.add(bar, BorderLayout.SOUTH);
+        return main;
+    }
+
+    private JPanel buildToolbar() {
+        JPanel tb = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 6));
+        tb.setBackground(Theme.SURFACE_COLOR);
+        tb.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, Theme.BORDER_COLOR));
+
+        tb.add(tbBtn("Sidebar", VectorIcon.Type.SIDEBAR, this::toggleSidebar));
+        tb.add(sep());
+        tb.add(tbBtn("New",    VectorIcon.Type.PLUS,    this::newFile));
+        tb.add(tbBtn("Open",   VectorIcon.Type.FOLDER,  this::openFile));
+        tb.add(tbBtn("Save",   VectorIcon.Type.SAVE,    this::saveFile));
+        tb.add(tbBtn("Save As",VectorIcon.Type.SAVE,    this::saveFileAs));
+        tb.add(sep());
+        tb.add(tbBtn("Undo",   VectorIcon.Type.UNDO,    () -> { if (currentEditor != null) currentEditor.undo(); }));
+        tb.add(tbBtn("Redo",   VectorIcon.Type.REDO,    () -> { if (currentEditor != null) currentEditor.redo(); }));
+        tb.add(tbBtn("Comment",VectorIcon.Type.COMMENT, () -> { if (currentEditor != null) currentEditor.toggleLineComment(); }));
+        tb.add(tbBtn("Go To",  VectorIcon.Type.SEARCH,  this::showGoToLine));
+        tb.add(sep());
+
+        JButton check = new JButton("Check Code  (Ctrl+Enter)", new VectorIcon(VectorIcon.Type.PLAY, 14, Color.WHITE));
+        check.setBackground(new Color(0x2ea043));
+        check.setForeground(Color.WHITE);
+        check.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        check.setFocusPainted(false);
+        check.setOpaque(true);
+        check.setBorderPainted(false);
+        check.setBorder(BorderFactory.createEmptyBorder(6, 12, 6, 20));
+        check.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        check.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent e) { check.setBackground(new Color(0x3cb551)); }
+            public void mouseExited(MouseEvent e)  { check.setBackground(new Color(0x2ea043)); }
+        });
+        check.addActionListener(e -> checkCode());
+        tb.add(check);
+        return tb;
+    }
+
+    private JButton tbBtn(String label, VectorIcon.Type iconType, Runnable action) {
+        JButton b = new JButton(label, new VectorIcon(iconType, 14, Theme.TEXT_MAIN));
+        b.setBackground(Theme.SURFACE_COLOR);
+        b.setForeground(Theme.TEXT_MAIN);
+        b.setFont(Theme.UI_FONT_SMALL);
+        b.setFocusPainted(false);
+        b.setOpaque(true);
+        b.setBorderPainted(false);
+        b.setBorder(BorderFactory.createEmptyBorder(6, 10, 6, 10));
+        b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        b.addActionListener(e -> action.run());
+        b.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent e) { b.setBackground(Theme.CURRENT_LINE); }
+            public void mouseExited(MouseEvent e)  { b.setBackground(Theme.SURFACE_COLOR); }
+        });
+        return b;
+    }
+
+    private JSeparator sep() {
+        JSeparator s = new JSeparator(JSeparator.VERTICAL);
+        s.setPreferredSize(new Dimension(1, 20));
+        s.setForeground(Theme.BORDER_COLOR);
+        return s;
+    }
+
+    private void toggleSidebar() {
+        sidebarVisible = !sidebarVisible;
+        if (sidebarVisible) {
+            fileExplorer.setVisible(true);
+            mainSplit.setDividerLocation(220);
+        } else {
+            fileExplorer.setVisible(false);
+            mainSplit.setDividerLocation(0);
+        }
+        mainSplit.revalidate();
+        mainSplit.repaint();
+    }
+
+    private void updateTabColors() {
+        int selected = tabbedPane.getSelectedIndex();
+        for (int i = 0; i < tabbedPane.getTabCount(); i++) {
+            Component tc = tabbedPane.getTabComponentAt(i);
+            if (tc instanceof JPanel) {
+                for (Component c : ((JPanel) tc).getComponents()) {
+                    if (c instanceof JLabel) c.setForeground(i == selected ? Theme.TAB_SELECTED_FG : Theme.TAB_UNSELECTED_FG);
+                }
+            }
+        }
+        tabbedPane.repaint();
+    }
+
+    private void checkCode() {
+        if (currentEditor == null) { status("No file open"); return; }
+        String code = currentEditor.textPane.getText();
+        if (code.trim().isEmpty()) { terminalPanel.clear(); status("Empty file — nothing to check"); return; }
+        status("Checking…");
+        new Thread(() -> {
+            ErrorManager em = checker.checkCode(code);
+            SwingUtilities.invokeLater(() -> {
+                terminalPanel.displayErrors(em);
+                currentEditor.setErrors(em.getErrors());
+                if (em.hasErrors()) {
+                    status("Found " + em.getErrorCount() + " error" + (em.getErrorCount() != 1 ? "s" : "")
+                            + ", " + em.getWarningCount() + " warning" + (em.getWarningCount() != 1 ? "s" : ""));
+                } else if (em.hasIssues()) {
+                    status("No errors — " + em.getWarningCount() + " warning" + (em.getWarningCount() != 1 ? "s" : ""));
+                } else {
+                    status("\u2713 No issues found");
+                }
+            });
+        }).start();
+    }
+
+    private void newFile() {
+        CodeEditor ed = new CodeEditor();
+        String name = "Untitled" + (tabbedPane.getTabCount() + 1) + ".java";
+        ed.textPane.addCaretListener(e -> updateCursor());
+        tabbedPane.addTab(name, ed);
+        tabbedPane.setSelectedComponent(ed);
+        currentEditor = ed;
+        terminalPanel.setCurrentEditor(ed);
+        addCloseTab(tabbedPane.getTabCount() - 1, name);
+        status("New file");
+    }
+
+    private void openFile() {
+        JFileChooser fc = new JFileChooser();
+        Theme.themeFileChooser(fc);
+        fc.setFileFilter(new javax.swing.filechooser.FileFilter() {
+            public boolean accept(File f) { return f.isDirectory() || f.getName().endsWith(".java"); }
+            public String getDescription() { return "Java Files (*.java)"; }
+        });
+        if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
+            openFromExplorer(fc.getSelectedFile());
+        }
+    }
+
+    private void openFromExplorer(File file) {
+        for (Map.Entry<CodeEditor, File> en : editorFiles.entrySet()) {
+            if (en.getValue().equals(file)) { tabbedPane.setSelectedComponent(en.getKey()); return; }
+        }
+        try {
+            String content = new String(Files.readAllBytes(file.toPath()));
+            CodeEditor ed = new CodeEditor();
+            ed.textPane.setText(content);
+            ed.textPane.addCaretListener(e -> updateCursor());
+            tabbedPane.addTab(file.getName(), ed);
+            tabbedPane.setSelectedComponent(ed);
+            currentEditor = ed;
+            terminalPanel.setCurrentEditor(ed);
+            editorFiles.put(ed, file);
+            addCloseTab(tabbedPane.getTabCount() - 1, file.getName());
+            status("Opened: " + file.getName());
+            SyntaxHighlighter.applyHighlighting(ed.textPane);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, "Could not open: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void saveFile() {
+        if (currentEditor == null) return;
+        File f = editorFiles.get(currentEditor);
+        if (f == null) { saveFileAs(); return; }
+        try { Files.write(f.toPath(), currentEditor.textPane.getText().getBytes()); status("Saved: " + f.getName()); }
+        catch (IOException ex) { status("Save error: " + ex.getMessage()); }
+    }
+
+    private void saveFileAs() {
+        if (currentEditor == null) return;
+        JFileChooser fc = new JFileChooser();
+        Theme.themeFileChooser(fc);
+        fc.setFileFilter(new javax.swing.filechooser.FileFilter() {
+            public boolean accept(File f) { return f.isDirectory() || f.getName().endsWith(".java"); }
+            public String getDescription() { return "Java Files (*.java)"; }
+        });
+        if (fc.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+            File f = fc.getSelectedFile();
+            if (!f.getName().endsWith(".java")) f = new File(f.getAbsolutePath() + ".java");
+            try {
+                Files.write(f.toPath(), currentEditor.textPane.getText().getBytes());
+                editorFiles.put(currentEditor, f);
+                int idx = tabbedPane.indexOfComponent(currentEditor);
+                if (idx >= 0) {
+                    tabbedPane.setTitleAt(idx, f.getName());
+                    Component tc = tabbedPane.getTabComponentAt(idx);
+                    if (tc instanceof JPanel) {
+                        for (Component c : ((JPanel) tc).getComponents()) {
+                            if (c instanceof JLabel) ((JLabel) c).setText(f.getName() + "  ");
+                        }
+                    }
+                }
+                status("Saved as: " + f.getName());
+                fileExplorer.setDirectory(f.getParentFile());
+            } catch (IOException ex) { status("Save error: " + ex.getMessage()); }
+        }
+    }
+
+    private void showGoToLine() {
+        if (currentEditor == null) return;
+        String s = JOptionPane.showInputDialog(this, "Go to line:", "Go to Line", JOptionPane.PLAIN_MESSAGE);
+        if (s != null && !s.trim().isEmpty()) {
+            try { currentEditor.goToLine(Integer.parseInt(s.trim())); }
+            catch (NumberFormatException ex) { JOptionPane.showMessageDialog(this, "Enter a valid number", "Bad Input", JOptionPane.WARNING_MESSAGE); }
+        }
+    }
+
+    private void updateCursor() {
+        if (currentEditor == null) return;
+        int line = currentEditor.getCurrentLine();
+        int pos = currentEditor.textPane.getCaretPosition();
+        Element root = currentEditor.textPane.getDocument().getDefaultRootElement();
+        if (line > 0 && line <= root.getElementCount()) {
+            int col = pos - root.getElement(line - 1).getStartOffset() + 1;
+            cursorLabel.setText("Ln " + line + ", Col " + col);
+        }
+    }
+
+    private void status(String msg) { statusLabel.setText(msg); }
+
+    private void addCloseTab(int index, String title) {
+        JPanel panel = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        panel.setOpaque(false);
+
+        JLabel lbl = new JLabel(title + "  ");
+        lbl.setFont(Theme.UI_FONT_SMALL);
+        lbl.setForeground(Theme.TAB_UNSELECTED_FG);
+
+        JButton x = new JButton("\u00D7");
+        x.setFont(new Font("Segoe UI", Font.BOLD, 13));
+        x.setForeground(Theme.TEXT_MUTED);
+        x.setBorder(BorderFactory.createEmptyBorder());
+        x.setContentAreaFilled(false);
+        x.setFocusPainted(false);
+        x.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        x.addMouseListener(new MouseAdapter() {
+            public void mouseEntered(MouseEvent e) { x.setForeground(Theme.DANGER_COLOR); }
+            public void mouseExited(MouseEvent e)  { x.setForeground(Theme.TEXT_MUTED); }
+        });
+        x.addActionListener(e -> {
+            int idx = tabbedPane.indexOfTabComponent(panel);
+            if (idx >= 0) {
+                Component comp = tabbedPane.getComponentAt(idx);
+                tabbedPane.remove(idx);
+                if (comp instanceof CodeEditor) { editorFiles.remove(comp); if (comp == currentEditor) currentEditor = null; }
+                updateTabColors();
+            }
+        });
+
+        panel.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    int idx = tabbedPane.indexOfTabComponent(panel);
+                    if (idx >= 0) {
+                        Component comp = tabbedPane.getComponentAt(idx);
+                        String oldTitle = lbl.getText().trim();
+                        String newTitle = (String) JOptionPane.showInputDialog(
+                                JavaErrorCheckerIDE.this, "Rename file:", "Rename",
+                                JOptionPane.PLAIN_MESSAGE, null, null, oldTitle);
+                        if (newTitle != null && !newTitle.trim().isEmpty()) {
+                            if (!newTitle.endsWith(".java")) newTitle += ".java";
+                            lbl.setText(newTitle + "  ");
+                            tabbedPane.setTitleAt(idx, newTitle);
+                            if (comp instanceof CodeEditor) {
+                                File f = editorFiles.get(comp);
+                                if (f != null) {
+                                    File newFile = new File(f.getParentFile(), newTitle);
+                                    if (f.renameTo(newFile)) {
+                                        editorFiles.put((CodeEditor) comp, newFile);
+                                        status("Renamed to " + newTitle);
+                                    } else status("Failed to rename file on disk.");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        panel.add(lbl);
+        panel.add(x);
+        tabbedPane.setTabComponentAt(index, panel);
+        SwingUtilities.invokeLater(this::updateTabColors);
+    }
+
+    private void setupKeys() {
+        InputMap im = getRootPane().getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap am = getRootPane().getActionMap();
+        int ctrl = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
+
+        bind(im, am, KeyEvent.VK_N, ctrl, this::newFile);
+        bind(im, am, KeyEvent.VK_O, ctrl, this::openFile);
+        bind(im, am, KeyEvent.VK_S, ctrl, this::saveFile);
+        bind(im, am, KeyEvent.VK_S, ctrl | InputEvent.SHIFT_DOWN_MASK, this::saveFileAs);
+        bind(im, am, KeyEvent.VK_Z, ctrl, () -> { if (currentEditor != null) currentEditor.undo(); });
+        bind(im, am, KeyEvent.VK_Y, ctrl, () -> { if (currentEditor != null) currentEditor.redo(); });
+        bind(im, am, KeyEvent.VK_SLASH, ctrl, () -> { if (currentEditor != null) currentEditor.toggleLineComment(); });
+        bind(im, am, KeyEvent.VK_G, ctrl, this::showGoToLine);
+        bind(im, am, KeyEvent.VK_ENTER, ctrl, this::checkCode);
+        bind(im, am, KeyEvent.VK_L, ctrl, () -> terminalPanel.clear());
+        bind(im, am, KeyEvent.VK_B, ctrl, this::toggleSidebar);
+        bind(im, am, KeyEvent.VK_W, ctrl, () -> {
+            int i = tabbedPane.getSelectedIndex();
+            if (i >= 0) {
+                Component c = tabbedPane.getComponentAt(i);
+                tabbedPane.remove(i);
+                if (c instanceof CodeEditor) { editorFiles.remove(c); if (c == currentEditor) currentEditor = null; }
+                updateTabColors();
+            }
+        });
+    }
+
+    private void bind(InputMap im, ActionMap am, int key, int mod, Runnable r) {
+        String name = "k_" + key + "_" + mod;
+        im.put(KeyStroke.getKeyStroke(key, mod), name);
+        am.put(name, new AbstractAction() { public void actionPerformed(ActionEvent e) { r.run(); } });
+    }
+
+    public static void main(String[] args) {
+        try {
+            UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
+            UIManager.put("Panel.background",              Theme.APP_BG);
+            UIManager.put("OptionPane.background",         Theme.APP_BG);
+            UIManager.put("OptionPane.foreground",         Theme.TEXT_MAIN);
+            UIManager.put("OptionPane.messageForeground",  Theme.TEXT_MAIN);
+            UIManager.put("OptionPane.buttonBackground",   Theme.SURFACE_COLOR);
+            UIManager.put("OptionPane.buttonForeground",   Theme.TEXT_MAIN);
+            UIManager.put("OptionPane.inputBackground",    Theme.SURFACE_COLOR);
+            UIManager.put("OptionPane.inputForeground",    Theme.TEXT_MAIN);
+            UIManager.put("TextField.background",          Theme.SURFACE_COLOR);
+            UIManager.put("TextField.foreground",          Theme.TEXT_MAIN);
+            UIManager.put("TextField.caretForeground",     Theme.TEXT_MAIN);
+            UIManager.put("TextField.selectionBackground", Theme.CURRENT_LINE);
+            UIManager.put("TextField.selectionForeground", Theme.TEXT_MAIN);
+            UIManager.put("Button.font",                   Theme.UI_FONT);
+            UIManager.put("TabbedPane.background",         Theme.SURFACE_COLOR);
+            UIManager.put("TabbedPane.foreground",         Theme.TAB_UNSELECTED_FG);
+            UIManager.put("TabbedPane.selected",           Theme.TAB_SELECTED_BG);
+            UIManager.put("TabbedPane.selectedForeground", Theme.TAB_SELECTED_FG);
+            UIManager.put("TabbedPane.contentAreaColor",   Theme.APP_BG);
+            UIManager.put("FileChooser.background",        Theme.APP_BG);
+            UIManager.put("FileChooser.foreground",        Theme.TEXT_MAIN);
+            UIManager.put("FileChooser.viewBackground",    Theme.APP_BG);
+            UIManager.put("FileChooser.controlBackground", Theme.SURFACE_COLOR);
+        } catch (Exception ignore) {}
+
+        SwingUtilities.invokeLater(() -> new JavaErrorCheckerIDE().setVisible(true));
+    }
+}
