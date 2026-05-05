@@ -1,36 +1,49 @@
 package core.ast;
 
-public class ExpressionNode extends ASTNode {
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-    private final String  value;
-    private final ASTNode left;
-    private final ASTNode right;
+public abstract class ASTNode {
 
-    public ExpressionNode(String value, ASTNode left, ASTNode right,
-                          int line, int col, int startOffset, int endOffset) {
-        super(line, col, startOffset, endOffset);
-        this.value = value;
-        this.left  = left;
-        this.right = right;
+    protected int line;
+    protected int col;
+
+    public int startOffset;
+    public int endOffset;
+
+    public final List<ASTNode>        children   = new ArrayList<>();
+    public final Map<String, Object>  properties = new HashMap<>();
+
+    public ASTNode(int line, int col, int startOffset, int endOffset) {
+        this.line        = line;
+        this.col         = col;
+        this.startOffset = startOffset;
+        this.endOffset   = endOffset;
     }
 
-    
-    public String  getValue() { return value; }
-    public ASTNode getLeft()  { return left;  }
-    public ASTNode getRight() { return right; }
+    public int getLine()        { return line; }
+    public int getCol()         { return col; }
+    public int getStartOffset() { return startOffset; }
+    public int getEndOffset()   { return endOffset; }
 
-    public boolean isLiteral()  { return (Boolean) properties.getOrDefault("literal",  false); }
-    public boolean isOperator() { return (Boolean) properties.getOrDefault("operator", false); }
-
-    
-    @Override
-    public String printTree(String indent) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(indent).append("Expr[").append(value)
-          .append("] @").append(line).append(":").append(col).append("\n");
-        if (left  != null) sb.append(left .printTree(indent + "  "));
-        if (right != null) sb.append(right.printTree(indent + "  "));
-        for (ASTNode child : children) sb.append(child.printTree(indent + "  "));
-        return sb.toString();
+   
+    public void setRange(int start, int end) {
+        this.startOffset = start;
+        this.endOffset   = end;
     }
+
+
+    public void addChild(ASTNode child) {
+        if (child != null) children.add(child);
+    }
+
+    public List<ASTNode> getChildren() { return children; }
+
+    public void   setProperty(String key, Object value) { properties.put(key, value); }
+    public Object getProperty(String key)               { return properties.get(key); }
+
+
+    public abstract String printTree(String indent);
 }
