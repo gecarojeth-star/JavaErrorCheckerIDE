@@ -21,6 +21,21 @@ public class TokenManager {
         return MULTI_CHAR_OPERATORS.contains(op);
     }
 
+    /**
+     * Create an error token for malformed input.
+     * Used for reporting lexical errors without halting tokenization.
+     */
+    public ErrorToken createErrorToken(String lexeme, int line, int col, String errorMessage, String errorCode) {
+        return new ErrorToken(lexeme, line, col, errorMessage, errorCode);
+    }
+
+    /**
+     * Convenience method for creating error tokens with auto-generated error code.
+     */
+    public ErrorToken createErrorToken(String lexeme, int line, int col, String errorMessage) {
+        return new ErrorToken(lexeme, line, col, errorMessage);
+    }
+
     // The Factory Method
     public Token createToken(String lexeme, int line, int col) {
         
